@@ -12,6 +12,9 @@ BUILD_BROKEN_DUP_RULES := true
 BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
 BUILD_BROKEN_MISSING_REQUIRED_MODULES := true
 
+# PBRP Configs
+PB_DISABLE_DEFAULT_DM_VERITY := true
+
 # Architecture
 TARGET_ARCH := arm64
 TARGET_ARCH_VARIANT := armv8-a
@@ -163,11 +166,12 @@ TW_NO_RECOVERY_AS_BOOT := false
 TW_INPUT_BLACKLIST := "hbtp_vm"
 TW_HAS_MOUSE_CURSOR := true
 TW_USE_MTK_USB := true
-TW_OEM_STORAGE := 0
+TW_USE_F2FS := true
 
 # Storage
 TW_HAS_MTP := true
 TW_MTP_DEVICE := /dev/mtp_usb
+TW_INTERNAL_STORAGE_PATH := "/data/media/0"
 TW_NO_USB_STORAGE := false
 TARGET_USE_CUSTOM_LUN_FILE_PATH := /config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file
 
@@ -189,13 +193,16 @@ TW_INCLUDE_RESETPROP := true
 TW_EXCLUDE_APEX := true
 TW_EXCLUDE_DEFAULT_USB_INIT := true
 TW_EXCLUDE_TWRPAPP := true
-TW_EXCLUDE_BASH := true
-TW_EXCLUDE_NANO := true
-TW_EXCLUDE_LPDUMP := true
-TW_EXCLUDE_TZDATA := true
-TW_EXCLUDE_PYTHON := true
-TW_EXCLUDE_SUPER_VOLUME := true
+#TW_EXCLUDE_BASH := true
+#TW_EXCLUDE_NANO := true
+#TW_EXCLUDE_LPDUMP := true
+#TW_EXCLUDE_TZDATA := true
+#TW_EXCLUDE_PYTHON := true
+#TW_EXCLUDE_SUPER_VOLUME := true
 
 # Init
 TARGET_INIT_VENDOR_LIB := libinit_Infinix-Deviant
 TARGET_RECOVERY_DEVICE_MODULES := libinit_Infinix-Deviant
+
+# TWRP Configs
+TW_DEVICE_VERSION := excaliburXD

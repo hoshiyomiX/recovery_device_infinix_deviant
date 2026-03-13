@@ -5,6 +5,6 @@
 #
 
 PRODUCT_MAKEFILES := \
-     $(LOCAL_DIR)/twrp_Deviant.mk
+     $(LOCAL_DIR)/pb_Deviant.mk
 
-COMMON_LUNCH_CHOICES := twrp_Deviant-eng
+COMMON_LUNCH_CHOICES := pb_Deviant-eng

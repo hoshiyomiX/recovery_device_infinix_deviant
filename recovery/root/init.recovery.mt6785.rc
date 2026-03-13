@@ -1,5 +1,22 @@
 import /init.microtrust_Deviant.rc
 
+on early-init
+    mkdir /data 0 0 0755
+    mkdir /data/media 0 0 0755
+    mkdir /data/media/0 1023 1023 0771
+    chown media_rw media_rw /data/media/0
+    chmod 0771 /data/media/0
+    symlink /data/media/0 /sdcard
+    symlink /data/media/0 /internal_storage
+
+# We need vold early for metadata encryption
+on early-fs
+    start vold
+
+on late-fs
+    # Mount RW partitions which need run fsck
+    mount_all /first_stage_ramdisk/fstab.mt6785 --late
+    
 on init
     # Create a more standard /dev/block layout for our scripts
     symlink /dev/block/platform/bootdevice /dev/block/bootdevice
