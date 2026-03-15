@@ -36,10 +36,16 @@
 /spmfw                    emmc     /dev/block/platform/bootdevice/by-name/spmfw                    flags=display="Spmfw";slotselect;backup;flashimg
 /tee                      emmc     /dev/block/platform/bootdevice/by-name/tee                      flags=display="Tee";slotselect;backup;flashimg
 
+# Cache partition (tranfs)
+/cache                    ext4     /dev/block/platform/bootdevice/by-name/tranfs                   flags=display="Cache";backup;wipeingui
+
+# Super Partition
+/super                    emmc     /dev/block/platform/bootdevice/by-name/super                    flags=display="Super";backup;flashimg
+
 # External & Storage
 /storage                  f2fs     /data/media/0                                                   flags=display="Internal Storage";usermrf;backup=1;fsflags="bind";removable
-/external_sd              vfat     /dev/block/mmcblk0p1 /dev/block/mmcblk0 /dev/block/mmcblk1p1    flags=display="Micro SD Card";storage;wipeingui;removable;backup=0
-/usb_otg                  vfat     /dev/block/sda1 /dev/block/sda /dev/block/sdd1                  flags=display="USB-OTG";storage;wipeingui;removable;backup=0
+/external_sd              auto     /devices/platform/externdevice*                                 flags=display="Micro SD Card";storage;wipeingui;removable;backup=0
+/usb_otg                  auto     /devices/platform/usb3_xhci*                                    flags=display="USB-OTG";storage;wipeingui;removable;backup=0
 
 # Allow Flash GSI Image
 /system_image             emmc     /dev/block/mapper/system_a                                      flags=slotselect

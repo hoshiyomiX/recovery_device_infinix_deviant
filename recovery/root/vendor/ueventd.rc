@@ -9,6 +9,8 @@
 /dev/block/sda                                   0660    root    system
 /dev/block/sdb                                   0660    root    system
 /dev/block/sdc                                   0660    root    system
+/dev/block/sdc*                                  0660    root    system
+/dev/block/sdd                                   0660    root    system
 
 # eMMC/UFS common
 /dev/block/platform/bootdevice/by-name/misc2     0660    root    system
@@ -79,7 +81,7 @@
 /dev/teei_config          0660   system     system
 
 # add the read write right of ttyUSB*
-/dev/bus/usb/*     	  0660   root       usb
+/dev/bus/usb/*            0660   root       usb
 /dev/ttyUSB0              0660   radio      radio
 /dev/ttyUSB1              0660   radio      radio
 /dev/ttyUSB2              0660   radio      radio

@@ -22,3 +22,7 @@ product                                                 /product               e
 
 # Use tranfs as cache
 /dev/block/platform/bootdevice/by-name/tranfs           /cache                 ext4          noatime,nosuid,nodev,discard                                                                   wait,check,formattable
+
+# External Storage
+/devices/platform/externdevice*                         auto                   auto          defaults                                                                                       voldmanaged=sdcard1:auto
+/devices/platform/usb3_xhci*                            auto                   vfat          defaults                                                                                       voldmanaged=usbotg:auto
