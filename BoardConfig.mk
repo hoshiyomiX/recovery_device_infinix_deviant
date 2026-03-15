@@ -170,21 +170,21 @@ TW_MTP_DEVICE := /dev/mtp_usb
 TW_NO_USB_STORAGE := true
 TARGET_USE_CUSTOM_LUN_FILE_PATH := /config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file
 
-# Debug
-TWRP_INCLUDE_LOGCAT := true
-TARGET_USES_LOGD := true
+# Debug (Disable to save space)
+TWRP_INCLUDE_LOGCAT := false
+TARGET_USES_LOGD := false
 
 # Display / Touch
 BOARD_USE_FRAMEBUFFER_ALPHA_CHANNEL := true
 TARGET_DISABLE_TRIPLE_BUFFERING := false
 TARGET_SCREEN_HEIGHT := 2460
 
-# FS & Tools
-TW_INCLUDE_NTFS_3G := true
-TW_INCLUDE_REPACKTOOLS := true
+# FS & Tools (Minimal for size)
+TW_INCLUDE_NTFS_3G := false
+TW_INCLUDE_REPACKTOOLS := false
 TW_INCLUDE_RESETPROP := true
 
-# Exclude
+# Exclude (Maximum size reduction)
 TW_EXCLUDE_APEX := true
 TW_EXCLUDE_DEFAULT_USB_INIT := true
 TW_EXCLUDE_TWRPAPP := true
@@ -193,6 +193,20 @@ TW_EXCLUDE_NANO := true
 TW_EXCLUDE_LPDUMP := true
 TW_EXCLUDE_PYTHON := true
 TW_EXCLUDE_SUPER_VOLUME := true
+TW_EXCLUDE_LPTOOLS := true
+TW_EXCLUDE_APP_MANAGER := true
+TW_EXCLUDE_MTP := false
+TW_EXCLUDE_FUSE := false
+TW_EXCLUDE_GSETTINGS := true
+TW_EXCLUDE_TZDATA := false
+TW_EXCLUDE_NANOEDITOR := true
+TW_EXCLUDE_LZMA := true
+TW_EXCLUDE_ZIP := false
+TW_EXCLUDE_TAR := false
+TW_EXCLUDE_UNZIP := false
+TW_EXCLUDE_F2FS := false
+TW_EXCLUDE_FUSE_EXFAT := true
+TW_EXCLUDE_FUSE_NTFS := true
 
 # Init
 TARGET_INIT_VENDOR_LIB := libinit_Infinix-deviant
