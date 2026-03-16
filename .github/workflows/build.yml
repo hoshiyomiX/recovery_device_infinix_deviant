@@ -15,11 +15,11 @@ on:
       fox_branch:
         description: 'OrangeFox manifest branch'
         required: true
-        default: 'fox_11.0'
+        default: 'fox_12.1'
         type: choice
         options:
-          - fox_11.0
           - fox_12.1
+          - fox_11.0
       clean_build:
         description: 'Clean build (full sync)'
         required: false
@@ -49,7 +49,7 @@ jobs:
         run: |
           echo "DEVICE=deviant" >> $GITHUB_ENV
           echo "VENDOR=infinix" >> $GITHUB_ENV
-          FOX_BRANCH="${{ github.event.inputs.fox_branch || 'fox_11.0' }}"
+          FOX_BRANCH="${{ github.event.inputs.fox_branch || 'fox_12.1' }}"
           echo "FOX_BRANCH=$FOX_BRANCH" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date -u +%Y%m%d)" >> $GITHUB_ENV
 
@@ -116,14 +116,23 @@ jobs:
             fox-source-
 
       - name: Sync OrangeFox source (Official Method)
+        id: sync_source
         run: |
-          # Extract version number from branch (fox_11.0 -> 11.0)
+          # Extract version number from branch (fox_12.1 -> 12.1)
           FOX_VERSION=$(echo "${{ env.FOX_BRANCH }}" | sed 's/fox_//')
           echo "OrangeFox version: $FOX_VERSION"
           
           if [ "${{ steps.cache_source.outputs.cache-hit }}" == "true" ] && [ "${{ github.event.inputs.clean_build }}" != "true" ]; then
             echo "✓ Using cached OrangeFox source"
-          else
+            if [ ! -d ~/fox ]; then
+              echo "⚠️ Cache exists but ~/fox not found, will sync anyway"
+              CACHE_HIT="false"
+            else
+              CACHE_HIT="true"
+            fi
+          fi
+          
+          if [ "$CACHE_HIT" != "true" ]; then
             echo "→ Syncing OrangeFox source using official sync script..."
             mkdir -p ~/OrangeFox_sync
             cd ~/OrangeFox_sync
@@ -131,11 +140,28 @@ jobs:
             cd sync
             
             # Run the official sync script
-            ./orangefox_sync.sh --branch $FOX_VERSION --path ~/fox
+            yes | ./orangefox_sync.sh --branch $FOX_VERSION --path ~/fox
+            
+            # Verify sync completed successfully
+            if [ ! -d ~/fox ]; then
+              echo "❌ ERROR: OrangeFox sync failed - ~/fox directory not created"
+              exit 1
+            fi
+            
+            echo "✓ OrangeFox source synced successfully"
+            ls -la ~/fox/
           fi
 
       - name: Setup device tree
         run: |
+          # Verify fox directory exists
+          if [ ! -d ~/fox ]; then
+            echo "❌ ERROR: ~/fox directory does not exist!"
+            echo "Contents of home directory:"
+            ls -la ~/
+            exit 1
+          fi
+          
           cd ~/fox
           mkdir -p device/${{ env.VENDOR }}/${{ env.DEVICE }}
           cp -r $GITHUB_WORKSPACE/device_tree/* device/${{ env.VENDOR }}/${{ env.DEVICE }}/
