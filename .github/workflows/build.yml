@@ -127,7 +127,20 @@ jobs:
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         set -e
-        lunch twrp_${{ env.DEVICE }}-eng && make clean && mka adbd bootimage -j$(nproc --all)
+        
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'Fresh Build' }}"
+        
+        lunch twrp_${{ env.DEVICE }}-eng
+        
+        if [ "$BUILD_TYPE" = "Quick Rebuild" ]; then
+          echo "=== Quick Rebuild Mode ==="
+          mka adbd bootimage-nodeps -j$(nproc --all)
+        else
+          echo "=== Fresh Build Mode ==="
+          make clean
+          mka adbd bootimage -j$(nproc --all)
+        fi
+        
         ccache -s
       continue-on-error: true
 
