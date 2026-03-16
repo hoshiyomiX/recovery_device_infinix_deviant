@@ -22,6 +22,3 @@ ro.postinstall.fstab.prefix=/system
 
 # USB
 ro.sys.usb.storage.type=mtp
-
-# Build ID default
-ro.system.build.id=RP1A.200720.011
