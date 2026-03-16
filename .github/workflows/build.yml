@@ -59,7 +59,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: /tmp/ccache
-        key: ccache-${{ env.DEVICE }}-${{ github.run_number }}
+        key: ccache-${{ env.DEVICE }}-latest
         restore-keys: ccache-${{ env.DEVICE }}-
 
     - name: Configure ccache
@@ -74,7 +74,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/OrangeFox/fox_12.1/out
-        key: out-${{ env.DEVICE }}-${{ github.run_number }}
+        key: out-${{ env.DEVICE }}-latest
         restore-keys: out-${{ env.DEVICE }}-
 
     - name: Sync OrangeFox source
