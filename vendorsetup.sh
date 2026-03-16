@@ -38,14 +38,28 @@ export OF_PATCH_BOOTIMAGE=false
 
 export FOX_DRASTIC_SIZE_REDUCTION=1
 
+# Disable vendor-specific features
+export FOX_NO_SAMSUNG_SPECIAL=true
+export FOX_NO_MIUI_SPECIAL=true
+export FOX_NO_MIUI_PATCH=true
+
+# Language & Theme (minimal)
+export FOX_DEFAULT_LANGUAGE="en"
+export FOX_ENABLE_MULTILANG=0
+export FOX_THEME="FOX_THEME_DEFAULT"
+
 # ============================================
 # ESSENTIAL FEATURES
 # ============================================
 
 # Magisk support (required for boot patching)
 export OF_USE_MAGISKBOOT=1
-export OF_USE_MAGISKBOOT_FOR_ALL_PATCHES=1
+export OF_USE_MAGISKBOOT_FOR_ALL_PATCHES=0
 export OF_NEW_MAGISKBOOT=1
+export FOX_BUILD_MAGISK=0
+
+# Recovery image builder
+export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
 
 # AVB & Treble
 export OF_PATCH_AVB20=1
@@ -68,11 +82,15 @@ export OF_KEEP_DM_VERITY=1
 # Logging (keep for debugging)
 export TW_INCLUDE_LOGD=true
 
+# Legacy props & Screen
+export TW_NO_LEGACY_PROPS=true
+export TW_NO_SCREEN_BLANK=true
+
 # ============================================
 # BUILD METADATA
 # ============================================
 
-export FOX_BUILD_TYPE="userdebug"
+export FOX_BUILD_TYPE="Unofficial-Minimal"
 export FOX_VARIANT="XOS-V590"
 export OF_MAINTAINER="excaliburXD"
 
