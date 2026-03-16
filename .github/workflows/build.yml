@@ -54,6 +54,18 @@ jobs:
         git config --global user.email "actions@github.com"
         git config --global color.ui auto
 
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        key: ccache-${{ env.DEVICE }}-${{ github.run_id }}
+        restore-keys: ccache-${{ env.DEVICE }}-
+
+    - name: Configure ccache
+      run: |
+        ccache -M 10G
+        ccache -z
+
     - name: Sync OrangeFox source
       run: |
         echo "=== Creating OrangeFox directories ==="
@@ -112,8 +124,11 @@ jobs:
         set +e
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
+        export USE_CCACHE=1
+        export CCACHE_EXEC=/usr/bin/ccache
         set -e
         lunch twrp_${{ env.DEVICE }}-eng && make clean && mka adbd bootimage -j$(nproc --all)
+        ccache -s
       continue-on-error: true
 
     - name: Upload recovery image
