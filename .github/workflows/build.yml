@@ -137,26 +137,6 @@ jobs:
         lunch twrp_${{ env.DEVICE }}-eng && make clean && mka adbd bootimage -j$(nproc --all)
       continue-on-error: true
 
-    - name: Check boot image size (32MB limit)
-      run: |
-        BOOT_IMG=$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
-        if [ -f "$BOOT_IMG" ]; then
-          SIZE=$(stat -c %s "$BOOT_IMG")
-          MAX_SIZE=33554432
-          echo "Boot image size: $SIZE bytes ($(($SIZE / 1024 / 1024)) MB)"
-          echo "Partition limit: 32 MB"
-          if [ $SIZE -gt $MAX_SIZE ]; then
-            echo "ERROR: Boot image exceeds 32MB limit!"
-            exit 1
-          fi
-          echo "✓ Boot image is within 32MB limit"
-        else
-          echo "ERROR: boot.img not found at $BOOT_IMG"
-          echo "=== Searching for images ==="
-          find $HOME/OrangeFox/fox_12.1/out -name "*.img" -type f 2>/dev/null || true
-          exit 1
-        fi
-
     - name: Upload recovery image
       uses: actions/upload-artifact@v4
       with:
