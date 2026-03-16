@@ -10,11 +10,11 @@ on:
       build_type:
         description: 'Build Type'
         required: false
-        default: 'Fresh Build'
+        default: 'Without cache /out'
         type: choice
         options:
-          - Fresh Build
-          - Quick Rebuild
+          - Without cache /out
+          - With cache /out
 
 env:
   FOX_MAINTAINER_PATCH_VERSION: 1
@@ -65,6 +65,14 @@ jobs:
       run: |
         ccache -M 10G
         ccache -z
+
+    - name: Cache build output
+      if: github.event.inputs.build_type == 'With cache /out'
+      uses: actions/cache@v4
+      with:
+        path: ~/OrangeFox/fox_12.1/out
+        key: out-${{ env.DEVICE }}-${{ github.run_number }}
+        restore-keys: out-${{ env.DEVICE }}-
 
     - name: Sync OrangeFox source
       run: |
@@ -128,18 +136,19 @@ jobs:
         export CCACHE_EXEC=/usr/bin/ccache
         set -e
         
-        BUILD_TYPE="${{ github.event.inputs.build_type || 'Fresh Build' }}"
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'Without cache /out' }}"
         
         lunch twrp_${{ env.DEVICE }}-eng
         
-        if [ "$BUILD_TYPE" = "Quick Rebuild" ]; then
-          echo "=== Quick Rebuild Mode ==="
-          mka adbd bootimage-nodeps -j$(nproc --all)
+        if [ "$BUILD_TYPE" = "With cache /out" ]; then
+          echo "=== Build with cached /out ==="
+          echo "Building bootimage..."
         else
-          echo "=== Fresh Build Mode ==="
+          echo "=== Build without cached /out (Fresh) ==="
           make clean
-          mka adbd bootimage -j$(nproc --all)
         fi
+        
+        mka adbd bootimage -j$(nproc --all)
         
         ccache -s
       continue-on-error: true
