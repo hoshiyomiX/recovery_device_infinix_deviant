@@ -84,7 +84,6 @@ export OF_KEEP_DM_VERITY=1
 # ============================================
 
 export FOX_BUILD_TYPE="userdebug"
-export FOX_VERSION="R11.1-deviant"
 export FOX_VARIANT="XOS-V590"
 export OF_MAINTAINER="excaliburXD"
 
