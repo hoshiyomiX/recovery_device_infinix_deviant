@@ -17,6 +17,7 @@ on:
           - Quick Rebuild
 
 env:
+  FOX_MAINTAINER_PATCH_VERSION: R11.3
   DEVICE: deviant
   PLATFORM: mt6785
 
