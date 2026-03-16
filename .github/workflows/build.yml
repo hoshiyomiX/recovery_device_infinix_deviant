@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Free disk space
-      uses: hoshiyomiX/aggressive-disk-cleaner@v1
+      uses: hoshiyomiX/aggressive-disk-cleaner@main
 
     - name: Set up build environment
       run: |
