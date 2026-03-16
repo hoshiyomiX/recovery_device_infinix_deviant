@@ -5,13 +5,6 @@ export LC_ALL="C"
 export TARGET_DEVICE_ALT="X695D,X695,Infinix-X695D,Infinix-X695"
 export FOX_TARGET_DEVICES="X695C,deviant,Infinix-X695C"
 
-# Partitions Recovery
-export FOX_RECOVERY_BOOT_PARTITION="/dev/block/platform/bootdevice/by-name/boot"
-export FOX_RECOVERY_SYSTEM_PARTITION="/dev/block/by-name/system"
-export FOX_RECOVERY_VENDOR_PARTITION="/dev/block/by-name/vendor"
-export FOX_RECOVERY_SYSTEM_EXT_PARTITION="/dev/block/by-name/system_ext"
-export FOX_RECOVERY_PRODUCT_PARTITION="/dev/block/by-name/product"
-    
 # Device Partition Setup
 export FOX_AB_DEVICE=1
 export FOX_VIRTUAL_AB_DEVICE=1
@@ -23,18 +16,8 @@ export TARGET_NO_RECOVERY=1
 export OF_QUICK_BACKUP_RESTORE=1
 export OF_PATCH_BOOTIMAGE=false
 
-# Build Optimizations
-# NOTE: These variables may be deprecated in OrangeFox 12.1
-# export FOX_DELETE_AROMAFM=1
-# export FOX_REMOVE_AAPT=1
-
-# Feature Support
-export FOX_ENABLE_APP_MANAGER=1
-export FOX_USE_BASH_SHELL=1
-export FOX_ASH_IS_BASH=true
-export FOX_USE_NANO_EDITOR=1
-export FOX_USE_TAR_BINARY=1
-export FOX_USE_XZ_UTILS=1
+# Partitions Recovery
+export FOX_RECOVERY_BOOT_PARTITION="/dev/block/platform/bootdevice/by-name/boot"
 
 # Build Metadata
 export FOX_BUILD_TYPE="unofficial"
@@ -53,7 +36,7 @@ export OF_DISABLE_OTA_MENU=1
 export OF_ALLOW_DISABLE_NAVBAR=0
 export OF_FIX_OTA_UPDATE_MANUAL_FLASH_ERROR=1
 
-# Encryption & Magisk Handling & GSI
+# Encryption & Magisk Handling
 export OF_DISABLE_FORCED_ENCRYPTION=1
 export OF_DISABLE_DM_VERITY_FORCED_ENCRYPTION=1
 export OF_USE_MAGISKBOOT=1
@@ -86,9 +69,15 @@ export OF_SKIP_MULTIUSER_FOLDERS_BACKUP="1"
 export OF_RUN_POST_FORMAT_PROCESS=1
 export OF_SKIP_ORANGEFOX_PROCESS=1
 
-# ============================================================
+# Feature Support
+export FOX_ENABLE_APP_MANAGER=1
+export FOX_USE_BASH_SHELL=1
+export FOX_ASH_IS_BASH=true
+export FOX_USE_NANO_EDITOR=1
+export FOX_USE_TAR_BINARY=1
+export FOX_USE_XZ_UTILS=1
+
 # OrangeFox 12.1 Required Variables
-# ============================================================
 export FOX_USE_TWRP_BRIGHTNESS_SOURCE="/sys/class/leds/lcd-backlight/brightness"
 export OF_TARGET_DEVICES="X695C,deviant,Infinix-X695C"
 export FOX_LUN_FILE_PATH="/config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file"
