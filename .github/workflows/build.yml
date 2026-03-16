@@ -55,19 +55,15 @@ jobs:
         git config --global user.email "actions@github.com"
         git config --global color.ui auto
 
-    - name: Cache OrangeFox full source and ccache
-      uses: actions/cache@v4
+    - name: Restore OrangeFox source cache
       id: cache
+      uses: actions/cache@v4
       with:
-        path: |
-          ~/OrangeFox/fox_12.1
-          ~/.ccache
-        key: orangefox-full-fox_12.1-${{ hashFiles('BoardConfig.mk') }}
-        restore-keys: |
-          orangefox-full-fox_12.1-
-          orangefox-full-
+        path: ~/OrangeFox/fox_12.1
+        key: orangefox-fox_12.1-${{ github.run_id }}
+        restore-keys: orangefox-fox_12.1-
 
-    - name: Initialize OrangeFox R11.3 (fox_12.1 manifest)
+    - name: Sync OrangeFox source
       if: steps.cache.outputs.cache-hit != 'true'
       run: |
         echo "=== Creating OrangeFox directories ==="
@@ -95,22 +91,15 @@ jobs:
           exit 1
         fi
 
-    - name: Verify cached OrangeFox source
-      if: steps.cache.outputs.cache-hit == 'true'
+    - name: Verify OrangeFox source
       run: |
-        echo "=== Restoring OrangeFox source from cache ==="
-        echo "=== Source directory size ==="
-        du -sh $HOME/OrangeFox/fox_12.1 2>/dev/null || echo "Cache not found!"
-        echo "=== Verifying build directory ==="
-        ls -la $HOME/OrangeFox/fox_12.1/ 2>/dev/null || echo "ERROR: fox_12.1 directory not found!"
-
+        echo "=== OrangeFox source directory size ==="
+        du -sh $HOME/OrangeFox/fox_12.1 2>/dev/null || echo "ERROR: Directory not found!"
         echo "=== Checking for build/envsetup.sh ==="
         if [ -f "$HOME/OrangeFox/fox_12.1/build/envsetup.sh" ]; then
-          echo "✓ build/envsetup.sh found!"
+          echo "✓ OrangeFox source ready!"
         else
-          echo "ERROR: build/envsetup.sh NOT found in cache! Cache may be corrupted."
-          echo "=== Directory structure: ==="
-          find $HOME/OrangeFox/fox_12.1 -maxdepth 2 -type d 2>/dev/null | head -20
+          echo "ERROR: build/envsetup.sh NOT found!"
           exit 1
         fi
 
