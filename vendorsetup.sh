@@ -24,8 +24,9 @@ export OF_QUICK_BACKUP_RESTORE=1
 export OF_PATCH_BOOTIMAGE=false
 
 # Build Optimizations
-export FOX_DELETE_AROMAFM=1
-export FOX_REMOVE_AAPT=1
+# NOTE: These variables may be deprecated in OrangeFox 12.1
+# export FOX_DELETE_AROMAFM=1
+# export FOX_REMOVE_AAPT=1
 
 # Feature Support
 export FOX_ENABLE_APP_MANAGER=1
@@ -36,8 +37,8 @@ export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 
 # Build Metadata
-export FOX_BUILD_TYPE="userdebug"
-export FOX_VERSION="R11.1-deviant"
+export FOX_BUILD_TYPE="unofficial"
+export FOX_VERSION="R11.3"
 export FOX_VARIANT="XOS-V590"
 export OF_MAINTAINER="excaliburXD"
 
@@ -84,3 +85,13 @@ export OF_QUICK_BACKUP_LIST="/boot;/data;"
 export OF_SKIP_MULTIUSER_FOLDERS_BACKUP="1"
 export OF_RUN_POST_FORMAT_PROCESS=1
 export OF_SKIP_ORANGEFOX_PROCESS=1
+
+# ============================================================
+# Missing OrangeFox 12.1 Required Variables (TO BE FIXED LATER)
+# ============================================================
+# export FOX_USE_TWRP_BRIGHTNESS_SOURCE="/sys/class/leds/lcd-backlight/brightness"
+# export OF_TARGET_DEVICES="X695C,deviant,Infinix-X695C"
+# export FOX_LUN_FILE_PATH="/config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file"
+# export OF_FORCE_PREBUILT_KERNEL=1
+# export FOX_REPLACE_TOOLBOX_GETPROP=1
+# export OF_NO_LEGACY_FILES=1
