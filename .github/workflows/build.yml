@@ -58,10 +58,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: ccache-${{ env.DEVICE }}-${{ github.sha }}
-        restore-keys: |
-          ccache-${{ env.DEVICE }}-
-          ccache-
+        key: ccache-${{ env.DEVICE }}-${{ github.run_number }}
+        restore-keys: ccache-${{ env.DEVICE }}-
 
     - name: Configure ccache
       run: |
