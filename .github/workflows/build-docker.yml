@@ -1,18 +1,23 @@
-name: Build TWRP (Docker)
+name: Build OrangeFox (Docker)
 
 on:
   workflow_dispatch:
     inputs:
-      twrp_branch:
-        description: 'TWRP manifest branch'
+      fox_branch:
+        description: 'OrangeFox manifest branch'
         required: true
-        default: 'twrp-11'
+        default: 'fox_11.0'
         type: choice
         options:
-          - twrp-11
-          - twrp-12.1
+          - fox_11.0
+          - fox_12.1
       clean_build:
         description: 'Clean build (full sync)'
+        required: false
+        default: false
+        type: boolean
+      release_build:
+        description: 'Create release'
         required: false
         default: false
         type: boolean
@@ -20,7 +25,7 @@ on:
 env:
   DEVICE: deviant
   VENDOR: infinix
-  MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
+  MANIFEST_URL: https://gitlab.com/OrangeFox/Manifest.git
 
 jobs:
   build:
@@ -34,6 +39,14 @@ jobs:
       - name: Checkout device tree
         uses: actions/checkout@v4
 
+      - name: Set environment variables
+        run: |
+          echo "DEVICE=deviant" >> $GITHUB_ENV
+          echo "VENDOR=infinix" >> $GITHUB_ENV
+          FOX_BRANCH="${{ github.event.inputs.fox_branch || 'fox_11.0' }}"
+          echo "FOX_BRANCH=$FOX_BRANCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u +%Y%m%d)" >> $GITHUB_ENV
+
       - name: Set up build environment
         run: |
           apt-get update
@@ -46,7 +59,7 @@ jobs:
             libxml2-utils lzop pngcrush \
             rsync schedtool squashfs-tools xsltproc \
             zip zlib1g-dev python3 openjdk-11-jdk \
-            sudo wget
+            sudo wget ca-certificates
 
       - name: Install repo
         run: |
@@ -62,29 +75,99 @@ jobs:
 
       - name: Initialize and sync source
         run: |
-          mkdir -p ~/twrp && cd ~/twrp
-          repo init -u ${{ env.MANIFEST_URL }} -b ${{ github.event.inputs.twrp_branch || 'twrp-11' }} --depth=1
+          mkdir -p ~/fox && cd ~/fox
+          repo init -u ${{ env.MANIFEST_URL }} -b ${{ env.FOX_BRANCH }} --depth=1
           repo sync -j$(nproc --all) || repo sync -j$(nproc --all)
 
       - name: Setup device tree
         run: |
-          cd ~/twrp
+          cd ~/fox
           mkdir -p device/${{ env.VENDOR }}/${{ env.DEVICE }}
           cp -r $GITHUB_WORKSPACE/* device/${{ env.VENDOR }}/${{ env.DEVICE }}/
+          
+          # Remove workflow files from device tree
+          rm -rf device/${{ env.VENDOR }}/${{ env.DEVICE }}/.github
+          
+          echo "Device tree contents:"
+          ls -la device/${{ env.VENDOR }}/${{ env.DEVICE }}/
 
-      - name: Build TWRP
+      - name: Build OrangeFox Recovery
         run: |
-          cd ~/twrp
+          cd ~/fox
           source build/envsetup.sh
-          lunch omni_${{ env.DEVICE }}-eng
+          lunch twrp_${{ env.DEVICE }}-eng
           mka bootimage -j$(nproc --all)
+
+      - name: Prepare artifacts
+        run: |
+          cd ~/fox
+          mkdir -p output
+          
+          # Copy boot.img (recovery image for A/B devices)
+          if [ -f out/target/product/${{ env.DEVICE }}/boot.img ]; then
+            cp out/target/product/${{ env.DEVICE }}/boot.img output/
+            echo "✓ boot.img found and copied"
+          else
+            echo "✗ boot.img not found"
+          fi
+          
+          # Copy recovery.img if exists (non A/B devices)
+          if [ -f out/target/product/${{ env.DEVICE }}/recovery.img ]; then
+            cp out/target/product/${{ env.DEVICE }}/recovery.img output/
+            echo "✓ recovery.img found and copied"
+          fi
+          
+          # Generate build info
+          cat > output/BUILD_INFO.md << EOF
+          ## OrangeFox Recovery Build Information
+          
+          | Property | Value |
+          |----------|-------|
+          | Device | ${{ env.DEVICE }} |
+          | Variant | X695C/X695D/X695 |
+          | OrangeFox Branch | ${{ env.FOX_BRANCH }} |
+          | Build Date | $(date -u +"%Y-%m-%d %H:%M:%S UTC") |
+          | Commit | ${{ github.sha }} |
+          | Build Type | Docker |
+          
+          ### Flashing Instructions
+          \`\`\`bash
+          # Boot to fastboot mode
+          fastboot flash boot_a boot.img
+          fastboot flash boot_b boot.img
+          fastboot reboot recovery
+          \`\`\`
+          
+          ### Device Support
+          - Infinix X695C
+          - Infinix X695D  
+          - Infinix X695
+          EOF
+          
+          ls -la output/
+          
+          # Copy to workspace for release upload
+          mkdir -p $GITHUB_WORKSPACE/output
+          cp -r output/* $GITHUB_WORKSPACE/output/ || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: twrp-${{ env.DEVICE }}-${{ github.run_number }}
-          path: |
-            ~/twrp/out/target/product/${{ env.DEVICE }}/boot.img
-            ~/twrp/out/target/product/${{ env.DEVICE }}/recovery.img
+          name: orangefox-${{ env.DEVICE }}-${{ env.BUILD_DATE }}-${{ github.run_number }}
+          path: ~/fox/output/
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Upload to Release
+        if: github.event.inputs.release_build == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.BUILD_DATE }}-${{ github.run_number }}
+          name: OrangeFox ${{ env.DEVICE }} ${{ env.BUILD_DATE }} (Docker)
+          body_path: ${{ github.workspace }}/output/BUILD_INFO.md
+          files: |
+            ${{ github.workspace }}/output/boot.img
+            ${{ github.workspace }}/output/recovery.img
+            ${{ github.workspace }}/output/BUILD_INFO.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
