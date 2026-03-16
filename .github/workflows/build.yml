@@ -202,7 +202,7 @@ jobs:
         run: |
           cd ~/fox
           source build/envsetup.sh
-          lunch twrp_${{ env.DEVICE }}-eng
+          lunch orfox_${{ env.DEVICE }}-eng
           mka bootimage -j$(nproc --all)
 
       - name: Prepare artifacts

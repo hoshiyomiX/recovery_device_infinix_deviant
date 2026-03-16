@@ -71,7 +71,7 @@ export OF_ENABLE_LPTOOLS=1
 export OF_ADVANCED_SECURITY=1
 export FOX_BUGGED_AOSP_ARB_WORKAROUND="1546300800"
 export OF_KEEP_DM_VERITY=1
-export OF_DISABLE_MIUI_SPECIFIC_FEATURES=1 
+export OF_DISABLE_MIUI_SPECIFIC_FEATURES=1
 
 # UI Layout Settings
 export OF_SCREEN_H=2400
@@ -87,11 +87,11 @@ export OF_RUN_POST_FORMAT_PROCESS=1
 export OF_SKIP_ORANGEFOX_PROCESS=1
 
 # ============================================================
-# Missing OrangeFox 12.1 Required Variables (TO BE FIXED LATER)
+# OrangeFox 12.1 Required Variables
 # ============================================================
-# export FOX_USE_TWRP_BRIGHTNESS_SOURCE="/sys/class/leds/lcd-backlight/brightness"
-# export OF_TARGET_DEVICES="X695C,deviant,Infinix-X695C"
-# export FOX_LUN_FILE_PATH="/config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file"
-# export OF_FORCE_PREBUILT_KERNEL=1
-# export FOX_REPLACE_TOOLBOX_GETPROP=1
-# export OF_NO_LEGACY_FILES=1
+export FOX_USE_TWRP_BRIGHTNESS_SOURCE="/sys/class/leds/lcd-backlight/brightness"
+export OF_TARGET_DEVICES="X695C,deviant,Infinix-X695C"
+export FOX_LUN_FILE_PATH="/config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file"
+export OF_FORCE_PREBUILT_KERNEL=1
+export FOX_REPLACE_TOOLBOX_GETPROP=1
+export OF_NO_LEGACY_FILES=1
