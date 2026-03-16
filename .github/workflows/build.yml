@@ -105,6 +105,22 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global color.ui auto
 
+      - name: Install repo tool
+        run: |
+          # Create bin directory
+          mkdir -p ~/bin
+          
+          # Download repo tool
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          
+          # Add to PATH for current session
+          echo "$HOME/bin" >> $GITHUB_PATH
+          
+          # Verify installation
+          ~/bin/repo --version || echo "repo version check completed"
+          echo "✓ repo tool installed successfully"
+
       - name: Cache OrangeFox source
         id: cache_source
         uses: actions/cache@v4
@@ -118,6 +134,18 @@ jobs:
       - name: Sync OrangeFox source (Official Method)
         id: sync_source
         run: |
+          # Ensure repo is in PATH
+          export PATH="$HOME/bin:$PATH"
+          
+          # Verify repo is available
+          if ! command -v repo &> /dev/null; then
+            echo "❌ ERROR: repo command not found in PATH"
+            echo "PATH: $PATH"
+            ls -la ~/bin/ || echo "~/bin not found"
+            exit 1
+          fi
+          echo "✓ repo tool found at: $(which repo)"
+          
           # Extract version number from branch (fox_12.1 -> 12.1)
           FOX_VERSION=$(echo "${{ env.FOX_BRANCH }}" | sed 's/fox_//')
           echo "OrangeFox version: $FOX_VERSION"
