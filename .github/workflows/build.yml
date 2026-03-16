@@ -20,7 +20,7 @@ env:
   FOX_MAINTAINER_PATCH_VERSION: 1
   DEVICE: deviant
   PLATFORM: mt6785
-  CCACHE_DIR: ~/.ccache
+  CCACHE_DIR: /tmp/ccache
 
 jobs:
   build:
@@ -58,13 +58,13 @@ jobs:
     - name: Cache ccache
       uses: actions/cache@v4
       with:
-        path: ~/.ccache
+        path: /tmp/ccache
         key: ccache-${{ env.DEVICE }}-${{ github.run_number }}
         restore-keys: ccache-${{ env.DEVICE }}-
 
     - name: Configure ccache
       run: |
-        mkdir -p ~/.ccache
+        mkdir -p /tmp/ccache
         ccache -M 10G
         ccache -z
         echo "CCACHE_DIR: $(ccache -p | grep cache_dir)"
@@ -137,7 +137,7 @@ jobs:
         export ALLOW_MISSING_DEPENDENCIES=true
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
-        export CCACHE_DIR=$HOME/.ccache
+        export CCACHE_DIR=/tmp/ccache
         set -e
         
         BUILD_TYPE="${{ github.event.inputs.build_type || 'Without cache /out' }}"
