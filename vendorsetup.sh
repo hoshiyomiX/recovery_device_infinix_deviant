@@ -1,18 +1,27 @@
 #!/bin/bash
 
-# Locale & Device Configuration
+# ============================================
+# LOCALE & DEVICE CONFIGURATION
+# ============================================
+
 export LC_ALL="C"
 export TARGET_DEVICE_ALT="X695D,X695,Infinix-X695D,Infinix-X695"
 export FOX_TARGET_DEVICES="X695C,deviant,Infinix-X695C"
 
-# Partitions Recovery
+# ============================================
+# PARTITION CONFIGURATION
+# ============================================
+
 export FOX_RECOVERY_BOOT_PARTITION="/dev/block/platform/bootdevice/by-name/boot"
 export FOX_RECOVERY_SYSTEM_PARTITION="/dev/block/by-name/system"
 export FOX_RECOVERY_VENDOR_PARTITION="/dev/block/by-name/vendor"
 export FOX_RECOVERY_SYSTEM_EXT_PARTITION="/dev/block/by-name/system_ext"
 export FOX_RECOVERY_PRODUCT_PARTITION="/dev/block/by-name/product"
 
-# Device Partition Setup
+# ============================================
+# DEVICE PARTITION SETUP
+# ============================================
+
 export FOX_AB_DEVICE=1
 export FOX_VIRTUAL_AB_DEVICE=1
 export BOARD_USES_METADATA_PARTITION=1
@@ -24,48 +33,25 @@ export OF_QUICK_BACKUP_RESTORE=1
 export OF_PATCH_BOOTIMAGE=false
 
 # ============================================
-# SIZE REDUCTION FLAGS (32MB Boot Partition)
+# SIZE REDUCTION (32MB Boot Partition)
 # ============================================
 
-# Remove unnecessary components
-export FOX_DELETE_AROMAFM=1
-export FOX_DELETE_FOTA=1
-export FOX_DELETE_EXTRA_LANGS=1
-export FOX_DELETE_EXTRA_FILES=1
-export FOX_REMOVE_AAPT=1
-
-# Disable heavy features
-export OF_DISABLE_OTA_MENU=1
-export OF_DISABLE_MIUI_SPECIFIC_FEATURES=1
-export OF_NO_SPLASH_CHANGE=1
-export OF_SKIP_MULTIUSER_FOLDERS_BACKUP=1
-
-# Minimal toolset (disable heavy tools)
-export FOX_USE_BASH_SHELL=0
-export FOX_USE_NANO_EDITOR=0
-export FOX_USE_TAR_BINARY=0
-export FOX_USE_XZ_UTILS=0
-export FOX_ASH_IS_BASH=false
-export FOX_ENABLE_APP_MANAGER=0
-
-# Disable advanced features to save space
-export OF_ENABLE_LPTOOLS=0
-export OF_ADVANCED_SECURITY=0
+export FOX_DRASTIC_SIZE_REDUCTION=1
 
 # ============================================
-# ESSENTIAL FEATURES (Keep for functionality)
+# ESSENTIAL FEATURES
 # ============================================
 
-# Magisk support (needed for boot patching)
+# Magisk support (required for boot patching)
 export OF_USE_MAGISKBOOT=1
 export OF_USE_MAGISKBOOT_FOR_ALL_PATCHES=1
 export OF_NEW_MAGISKBOOT=1
 
-# AVB & Treble (essential)
+# AVB & Treble
 export OF_PATCH_AVB20=1
 export OF_NO_TREBLE_COMPATIBILITY_CHECK=1
 
-# Encryption & Decryption (CRITICAL - must keep)
+# Encryption & Decryption (CRITICAL)
 export OF_DISABLE_FORCED_ENCRYPTION=1
 export OF_DISABLE_DM_VERITY_FORCED_ENCRYPTION=1
 export OF_SKIP_FBE_DECRYPTION_SDKVERSION=31
@@ -79,6 +65,9 @@ export OF_FIX_DECRYPTION_ON_DATA_MEDIA=1
 export FOX_BUGGED_AOSP_ARB_WORKAROUND="1546300800"
 export OF_KEEP_DM_VERITY=1
 
+# Logging (keep for debugging)
+export TW_INCLUDE_LOGD=true
+
 # ============================================
 # BUILD METADATA
 # ============================================
@@ -87,20 +76,26 @@ export FOX_BUILD_TYPE="userdebug"
 export FOX_VARIANT="XOS-V590"
 export OF_MAINTAINER="excaliburXD"
 
-# UI & Hardware Features
+# ============================================
+# UI CONFIGURATION
+# ============================================
+
 export OF_USE_GREEN_LED=0
 export OF_FLASHLIGHT_ENABLE=0
 export OF_ALLOW_DISABLE_NAVBAR=0
 export OF_FIX_OTA_UPDATE_MANUAL_FLASH_ERROR=1
 
-# UI Layout Settings
+# Screen layout
 export OF_SCREEN_H=2400
 export OF_STATUS_H=100
 export OF_STATUS_INDENT_LEFT=52
 export OF_STATUS_INDENT_RIGHT=52
 export OF_CLOCK_POS=1
 
-# Backup & Post-Flash Config
+# ============================================
+# BACKUP CONFIGURATION
+# ============================================
+
 export OF_QUICK_BACKUP_LIST="/boot;/data;"
 export OF_RUN_POST_FORMAT_PROCESS=1
 export OF_SKIP_ORANGEFOX_PROCESS=1
