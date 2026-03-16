@@ -25,7 +25,6 @@ on:
 env:
   DEVICE: deviant
   VENDOR: infinix
-  MANIFEST_URL: https://gitlab.com/OrangeFox/Manifest.git
 
 jobs:
   build:
@@ -61,23 +60,25 @@ jobs:
             zip zlib1g-dev python3 openjdk-11-jdk \
             sudo wget ca-certificates
 
-      - name: Install repo
-        run: |
-          mkdir -p ~/bin
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-          chmod a+x ~/bin/repo
-          echo "$HOME/bin" >> $GITHUB_PATH
-
       - name: Configure git
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Initialize and sync source
+      - name: Sync OrangeFox source (Official Method)
         run: |
-          mkdir -p ~/fox && cd ~/fox
-          repo init -u ${{ env.MANIFEST_URL }} -b ${{ env.FOX_BRANCH }} --depth=1
-          repo sync -j$(nproc --all) || repo sync -j$(nproc --all)
+          # Extract version number from branch (fox_11.0 -> 11.0)
+          FOX_VERSION=$(echo "${{ env.FOX_BRANCH }}" | sed 's/fox_//')
+          echo "OrangeFox version: $FOX_VERSION"
+          
+          echo "→ Syncing OrangeFox source using official sync script..."
+          mkdir -p ~/OrangeFox_sync
+          cd ~/OrangeFox_sync
+          git clone https://gitlab.com/OrangeFox/sync.git --depth=1
+          cd sync
+          
+          # Run the official sync script
+          ./orangefox_sync.sh --branch $FOX_VERSION --path ~/fox
 
       - name: Setup device tree
         run: |
