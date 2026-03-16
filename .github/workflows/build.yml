@@ -54,16 +54,7 @@ jobs:
         git config --global user.email "actions@github.com"
         git config --global color.ui auto
 
-    - name: Check cached OrangeFox source
-      id: cache
-      uses: actions/cache@v4
-      with:
-        path: ~/OrangeFox/fox_12.1
-        key: orangefox-fox_12.1-${{ github.run_id }}
-        restore-keys: orangefox-fox_12.1-
-
     - name: Sync OrangeFox source
-      if: steps.cache.outputs.cache-hit != 'true'
       run: |
         echo "=== Creating OrangeFox directories ==="
         mkdir -p $HOME/OrangeFox/fox_12.1
@@ -89,13 +80,6 @@ jobs:
           find $HOME/OrangeFox/fox_12.1 -maxdepth 2 -type d 2>/dev/null | head -20
           exit 1
         fi
-
-    - name: Save OrangeFox source to cache
-      if: steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ~/OrangeFox/fox_12.1
-        key: orangefox-fox_12.1-${{ github.run_id }}
 
     - name: Verify OrangeFox source
       run: |
