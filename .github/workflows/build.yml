@@ -2,9 +2,9 @@ name: Build OrangeFox Recovery R11.3 (32MB Optimized)
 
 on:
   push:
-    branches: [ fox_12.1-final ]
+    branches: [ fox_12.1-64mb ]
   pull_request:
-    branches: [ fox_12.1-final ]
+    branches: [ fox_12.1-64mb ]
   workflow_dispatch:
     inputs:
       build_type:
@@ -15,6 +15,11 @@ on:
         options:
           - With cache /out
           - Without cache /out
+      decompile_only:
+        description: 'Only decompile existing boot.img (skip build)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   FOX_MAINTAINER_PATCH_VERSION: 1
@@ -43,7 +48,9 @@ jobs:
           git gnupg flex bison build-essential \
           zip curl zlib1g-dev gcc-multilib g++-multilib \
           ccache libxml2-utils xsltproc unzip python3 rsync \
-          libssl-dev libncurses5-dev bc lzop
+          libssl-dev libncurses5-dev bc lzop \
+          android-tools-adb android-tools-fastboot \
+          cpio
 
     - name: Install repo tool
       run: |
@@ -80,6 +87,7 @@ jobs:
         restore-keys: out-${{ env.DEVICE }}-
 
     - name: Sync OrangeFox source
+      if: github.event.inputs.decompile_only != 'true'
       run: |
         echo "=== Creating OrangeFox directories ==="
         mkdir -p $HOME/OrangeFox/fox_12.1
@@ -105,6 +113,7 @@ jobs:
         fi
 
     - name: Clone device tree
+      if: github.event.inputs.decompile_only != 'true'
       run: |
         echo "=== Device tree setup ==="
         cd $HOME/OrangeFox/fox_12.1
@@ -112,12 +121,13 @@ jobs:
         mkdir -p device/infinix
 
         echo "=== Cloning device tree from ${{ github.repository }} ==="
-        git clone https://github.com/${{ github.repository }}.git device/infinix/${{ env.DEVICE }} -b fox_12.1-final --depth=1
+        git clone https://github.com/${{ github.repository }}.git device/infinix/${{ env.DEVICE }} -b fox_12.1-64mb --depth=1
 
         echo "=== Verifying device tree ==="
         ls -la device/infinix/${{ env.DEVICE }}/
 
     - name: Run pre-build hook (size reduction)
+      if: github.event.inputs.decompile_only != 'true'
       run: |
         echo "=== RUNNING PRE-BUILD HOOK ==="
 
@@ -135,6 +145,7 @@ jobs:
         fi
 
     - name: Building recovery
+      if: github.event.inputs.decompile_only != 'true'
       run: |
         cd $HOME/OrangeFox/fox_12.1
         set +e
@@ -162,6 +173,7 @@ jobs:
       continue-on-error: true
 
     - name: Verify boot image size
+      if: github.event.inputs.decompile_only != 'true'
       run: |
         BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
 
@@ -190,13 +202,216 @@ jobs:
           exit 1
         fi
 
+    - name: Install magiskboot for decompiling
+      run: |
+        echo "=== Installing magiskboot ==="
+        # Download latest Magisk APK
+        MAGISK_URL="https://github.com/topjohnwu/Magisk/releases/latest"
+        MAGISK_VERSION=$(curl -sL "$MAGISK_URL" | grep -oP 'tag/v\K[0-9.]+' | head -1)
+        echo "Magisk version: $MAGISK_VERSION"
+
+        # Download Magisk APK
+        curl -sL "https://github.com/topjohnwu/Magisk/releases/download/v${MAGISK_VERSION}/Magisk-v${MAGISK_VERSION}.apk" -o magisk.apk
+
+        # Extract magiskboot
+        unzip -j magisk.apk "lib/x86_64/libmagiskboot.so" -d .
+        mv libmagiskboot.so magiskboot
+        chmod +x magiskboot
+        sudo mv magiskboot /usr/local/bin/
+
+        # Verify
+        magiskboot --help || echo "magiskboot installed"
+
+    - name: Decompile boot.img
+      run: |
+        echo "=== Decompiling boot.img ==="
+
+        BOOT_IMG=""
+
+        # Check for built boot.img
+        if [ -f "$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img" ]; then
+          BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
+          echo "Found built boot.img"
+        else
+          echo "No built boot.img found, checking for existing boot.img..."
+          # Check if there's an existing boot.img in the repo
+          if [ -f "$GITHUB_WORKSPACE/boot.img" ]; then
+            BOOT_IMG="$GITHUB_WORKSPACE/boot.img"
+            echo "Found boot.img in repository"
+          else
+            echo "ERROR: No boot.img found to decompile"
+            exit 1
+          fi
+        fi
+
+        # Create decompiled directory
+        mkdir -p decompiled
+        cd decompiled
+
+        # Copy boot.img
+        cp "$BOOT_IMG" boot.img
+
+        # Get boot.img info
+        echo "=== Boot Image Info ==="
+        ls -la boot.img
+        file boot.img
+
+        # Decompile using magiskboot
+        echo "=== Extracting with magiskboot ==="
+        magiskboot unpack -h boot.img
+
+        # List extracted files
+        echo "=== Extracted Files ==="
+        ls -la
+
+        # Decompress kernel if compressed
+        if [ -f "kernel" ]; then
+          echo "=== Checking kernel compression ==="
+          file kernel
+
+          # Try to decompress
+          magiskboot decompress kernel kernel_unpacked 2>/dev/null || cp kernel kernel_unpacked
+          ls -la kernel*
+        fi
+
+        # Decompress ramdisk
+        if [ -f "ramdisk.cpio" ]; then
+          echo "=== Extracting ramdisk ==="
+          mkdir -p ramdisk
+          cd ramdisk
+          cpio -idmv < ../ramdisk.cpio 2>&1 | head -50
+          cd ..
+        elif [ -f "ramdisk.gz" ]; then
+          echo "=== Decompressing ramdisk.gz ==="
+          gunzip -c ramdisk.gz > ramdisk.cpio
+          mkdir -p ramdisk
+          cd ramdisk
+          cpio -idmv < ../ramdisk.cpio 2>&1 | head -50
+          cd ..
+        fi
+
+        # Fix permissions for upload-artifact (GitHub Actions can't read restricted dirs)
+        echo "=== Fixing permissions ==="
+        if [ -d "ramdisk" ]; then
+          chmod -R a+rX ramdisk 2>/dev/null || true
+          # Remove symlinks that point to non-existent targets (like /dev, /proc)
+          find ramdisk -type l -exec rm -f {} + 2>/dev/null || true
+        fi
+
+        # Create size analysis
+        echo "=== Creating Size Analysis ==="
+        cd ..
+        python3 << 'PYEOF'
+        import os
+        import json
+
+        def get_dir_size(path):
+            total = 0
+            for dirpath, dirnames, filenames in os.walk(path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    try:
+                        total += os.path.getsize(fp)
+                    except:
+                        pass
+            return total
+
+        analysis = {
+            "boot_img_size": os.path.getsize("decompiled/boot.img") if os.path.exists("decompiled/boot.img") else 0,
+            "components": {}
+        }
+
+        # Analyze decompiled folder
+        for item in os.listdir("decompiled"):
+            path = os.path.join("decompiled", item)
+            if os.path.isfile(path):
+                analysis["components"][item] = {
+                    "size": os.path.getsize(path),
+                    "type": "file"
+                }
+            elif os.path.isdir(path):
+                # Analyze subdirectories
+                subdirs = {}
+                for subitem in os.listdir(path):
+                    subpath = os.path.join(path, subitem)
+                    if os.path.isfile(subpath):
+                        subdirs[subitem] = {
+                            "size": os.path.getsize(subpath),
+                            "type": "file"
+                        }
+                    elif os.path.isdir(subpath):
+                        subdirs[subitem] = {
+                            "size": get_dir_size(subpath),
+                            "type": "directory"
+                        }
+
+                analysis["components"][item] = {
+                    "size": get_dir_size(path),
+                    "type": "directory",
+                    "contents": subdirs
+                }
+
+        # Save analysis
+        with open("decompiled/size_analysis.json", "w") as f:
+            json.dump(analysis, f, indent=2)
+
+        # Print summary
+        print("\n=== SIZE ANALYSIS SUMMARY ===")
+        for name, info in sorted(analysis["components"].items(), key=lambda x: x[1]["size"], reverse=True):
+            size_mb = info["size"] / (1024 * 1024)
+            print(f"{name}: {size_mb:.2f} MB")
+
+        print(f"\nTotal boot.img: {analysis['boot_img_size'] / (1024 * 1024):.2f} MB")
+        PYEOF
+
+        echo "=== Decompilation Complete ==="
+        ls -la decompiled/
+
+    - name: Upload decompiled files
+      uses: actions/upload-artifact@v4
+      with:
+        name: decompiled-boot-${{ env.DEVICE }}
+        path: decompiled/
+        retention-days: 30
+
     - name: Upload recovery image
       uses: actions/upload-artifact@v4
       with:
         name: OrangeFox-R11.3-${{ env.DEVICE }}-32mb
         path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
         retention-days: 7
-        if-no-files-found: error
+        if-no-files-found: warn
+
+    - name: Push decompiled to branch
+      run: |
+        echo "=== Pushing decompiled files to 'decompiled' branch ==="
+
+        # Configure git
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+
+        # Create or switch to decompiled branch
+        git checkout -B decompiled 2>/dev/null || git checkout decompiled
+
+        # Clean old files (keep .git)
+        find . -maxdepth 1 ! -name '.git' ! -name 'decompiled' ! -name '.' -exec rm -rf {} +
+
+        # Move decompiled contents to root
+        if [ -d "decompiled" ]; then
+          cp -r decompiled/* .
+          rm -rf decompiled
+        fi
+
+        # Add all files
+        git add -A
+
+        # Commit
+        git commit -m "Decompiled boot.img - $(date -u +'%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
+
+        # Push to decompiled branch
+        git push origin decompiled --force
+
+        echo "=== Pushed to decompiled branch ==="
 
     - name: Upload build log on failure
       uses: actions/upload-artifact@v4
