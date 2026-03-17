@@ -68,7 +68,7 @@ jobs:
     - name: Configure ccache
       run: |
         mkdir -p /tmp/ccache
-        ccache -M 10G
+        ccache -M 30G
         ccache -z
 
     - name: Cache build output
