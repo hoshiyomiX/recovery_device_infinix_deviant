@@ -160,17 +160,13 @@ TW_NO_LEGACY_PROPS := true
 TW_NO_FASTBOOT_BOOT := true
 TW_NO_RECOVERY_AS_BOOT := false
 TW_INPUT_BLACKLIST := "hbtp_vm"
-TW_HAS_MOUSE_CURSOR := true
 TW_USE_MTK_USB := true
 TW_OEM_STORAGE := 0
 
-# Storage
-TW_HAS_MTP := true
-TW_MTP_DEVICE := /dev/mtp_usb
+# Storage (MTP disabled for size)
 TW_NO_USB_STORAGE := true
-TARGET_USE_CUSTOM_LUN_FILE_PATH := /config/usb_gadget/g1/functions/mass_storage.usb0/lun.%d/file
 
-# Debug (Disable to save space)
+# Debug (Disabled to save space)
 TWRP_INCLUDE_LOGCAT := false
 TARGET_USES_LOGD := false
 
@@ -182,31 +178,43 @@ TARGET_SCREEN_HEIGHT := 2460
 # FS & Tools (Minimal for size)
 TW_INCLUDE_NTFS_3G := false
 TW_INCLUDE_REPACKTOOLS := false
-TW_INCLUDE_RESETPROP := true
+TW_INCLUDE_RESETPROP := false
 
-# Exclude (Maximum size reduction)
+# ============================================
+# MAXIMUM SIZE REDUCTION (32MB boot partition)
+# ============================================
+
+# Exclude components
 TW_EXCLUDE_APEX := true
 TW_EXCLUDE_DEFAULT_USB_INIT := true
 TW_EXCLUDE_TWRPAPP := true
 TW_EXCLUDE_BASH := true
 TW_EXCLUDE_NANO := true
+TW_EXCLUDE_NANOEDITOR := true
 TW_EXCLUDE_LPDUMP := true
+TW_EXCLUDE_LZMA := true
 TW_EXCLUDE_PYTHON := true
 TW_EXCLUDE_SUPER_VOLUME := true
 TW_EXCLUDE_LPTOOLS := true
 TW_EXCLUDE_APP_MANAGER := true
-TW_EXCLUDE_MTP := false
-TW_EXCLUDE_FUSE := false
 TW_EXCLUDE_GSETTINGS := true
-TW_EXCLUDE_TZDATA := false
-TW_EXCLUDE_NANOEDITOR := true
-TW_EXCLUDE_LZMA := true
-TW_EXCLUDE_ZIP := false
-TW_EXCLUDE_TAR := false
-TW_EXCLUDE_UNZIP := false
-TW_EXCLUDE_F2FS := false
+
+# Exclude storage/filesystem tools (save ~1MB)
+TW_EXCLUDE_MTP := true
+TW_EXCLUDE_FUSE := true
 TW_EXCLUDE_FUSE_EXFAT := true
 TW_EXCLUDE_FUSE_NTFS := true
+TW_EXCLUDE_TZDATA := true
+TW_EXCLUDE_F2FS := true
+
+# Exclude archive tools (save ~300KB)
+TW_EXCLUDE_ZIP := true
+TW_EXCLUDE_TAR := true
+TW_EXCLUDE_UNZIP := true
+
+# Disable features (save ~200KB)
+TW_INCLUDE_LOGD := false
+TW_HAS_MOUSE_CURSOR := false
 
 # Init
 TARGET_INIT_VENDOR_LIB := libinit_Infinix-deviant

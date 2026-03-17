@@ -36,7 +36,7 @@ export OF_PATCH_BOOTIMAGE=false
 # SIZE REDUCTION (32MB Boot Partition)
 # ============================================
 
-export FOX_DRASTIC_SIZE_REDUCTION=1
+export FOX_EXTREME_SIZE_REDUCTION=1
 
 # Disable vendor-specific features
 export FOX_NO_SAMSUNG_SPECIAL=true
