@@ -39,6 +39,7 @@ export FOX_USE_XZ_UTILS=1
 export FOX_BUILD_TYPE="userdebug"
 export FOX_VARIANT="XOS-V590"
 export OF_MAINTAINER="excaliburXD"
+export FOX_MAINTAINER_PATCH_VERSION=1
 
 # AVB & Treble
 export OF_PATCH_AVB20=1
