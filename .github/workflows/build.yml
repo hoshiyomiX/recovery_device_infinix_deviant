@@ -2,9 +2,9 @@ name: Build OrangeFox Recovery R11.3 (32MB Optimized)
 
 on:
   push:
-    branches: [ fox_12.1-64mb ]
+    branches: [ fox_12.1-final ]
   pull_request:
-    branches: [ fox_12.1-64mb ]
+    branches: [ fox_12.1-final ]
   workflow_dispatch:
     inputs:
       build_type:
@@ -121,7 +121,7 @@ jobs:
         mkdir -p device/infinix
 
         echo "=== Cloning device tree from ${{ github.repository }} ==="
-        git clone https://github.com/${{ github.repository }}.git device/infinix/${{ env.DEVICE }} -b fox_12.1-64mb --depth=1
+        git clone https://github.com/${{ github.repository }}.git device/infinix/${{ env.DEVICE }} -b fox_12.1-final --depth=1
 
         echo "=== Verifying device tree ==="
         ls -la device/infinix/${{ env.DEVICE }}/
