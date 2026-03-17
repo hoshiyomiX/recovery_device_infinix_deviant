@@ -14,7 +14,7 @@ on:
         type: choice
         options:
           - With cache /out
-          # - Without cache /out  # Temporarily disabled
+          - Without cache /out
 
 env:
   FOX_MAINTAINER_PATCH_VERSION: 1
@@ -145,7 +145,7 @@ jobs:
         export CCACHE_DIR=/tmp/ccache
         set -e
 
-        BUILD_TYPE="${{ github.event.inputs.build_type || 'Without cache /out' }}"
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'With cache /out' }}"
 
         lunch twrp_${{ env.DEVICE }}-eng
 
