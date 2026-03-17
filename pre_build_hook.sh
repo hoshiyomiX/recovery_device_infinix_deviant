@@ -137,7 +137,54 @@ if [ -d "$FONT_DIR" ]; then
 fi
 
 # ============================================
-# 4. REMOVE ICU LIBRARIES (Save ~4.4 MB)
+# 4. REMOVE EXTRA TERMINFO (Save ~11 MB uncompressed, ~3.5 MB compressed)
+# Keep only essential terminal definitions for recovery operation
+# ============================================
+TERMINFO_DIR="$FOX_SRC/system/etc/terminfo"
+
+if [ -d "$TERMINFO_DIR" ]; then
+    echo "=== REDUCING TERMINFO DATABASE ==="
+    echo "Terminfo directory: $TERMINFO_DIR"
+    echo "Before: $(du -sh "$TERMINFO_DIR" 2>/dev/null | cut -f1)"
+
+    # Essential terminals for OrangeFox Recovery:
+    # - linux: Linux console framebuffer (required for recovery UI)
+    # - vt100, vt102, vt220, vt320: Basic terminal compatibility
+    # - xterm, xterm-256color, xterm-color: ADB shell and external access
+    # - screen, screen-256color: Screen multiplexer support
+    # - ansi: ANSI terminal compatibility
+    # - dumb: Minimal terminal fallback
+    # - rxvt, rxvt-256color: Common terminal emulator
+    KEEP_TERMINALS="linux vt100 vt102 vt220 vt320 xterm xterm-256color xterm-color screen screen-256color ansi dumb rxvt rxvt-256color"
+
+    # Find and remove all terminals NOT in keep list
+    find "$TERMINFO_DIR" -type f | while read -r termfile; do
+        termname=$(basename "$termfile")
+        KEEP=false
+
+        for keep in $KEEP_TERMINALS; do
+            if [ "$termname" = "$keep" ]; then
+                KEEP=true
+                break
+            fi
+        done
+
+        if [ "$KEEP" = "false" ]; then
+            rm -f "$termfile"
+        fi
+    done
+
+    # Remove empty directories
+    find "$TERMINFO_DIR" -type d -empty -delete 2>/dev/null || true
+
+    echo "After:  $(du -sh "$TERMINFO_DIR" 2>/dev/null | cut -f1)"
+    echo ""
+    echo "Kept essential terminals: $KEEP_TERMINALS"
+    echo ""
+fi
+
+# ============================================
+# 5. REMOVE ICU LIBRARIES (Save ~4.4 MB)
 # Optional: Uncomment if single language only
 # ============================================
 # ICU_DIR="$FOX_SRC/external/icu"
@@ -160,5 +207,6 @@ echo "Size reduction applied to OrangeFox source:"
 echo "  - Extra themes removed (keep only Default)"
 echo "  - Extra languages removed (keep only English)"
 echo "  - Extra fonts removed (keep only Roboto-Regular)"
+echo "  - Extra terminfo removed (keep only essential terminals)"
 echo ""
 echo "Proceeding with build..."
