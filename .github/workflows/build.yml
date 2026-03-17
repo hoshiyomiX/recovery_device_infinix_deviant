@@ -10,11 +10,11 @@ on:
       build_type:
         description: 'Build Type'
         required: false
-        default: 'Without cache /out'
+        default: 'With cache /out'
         type: choice
         options:
-          - Without cache /out
           - With cache /out
+          # - Without cache /out  # Temporarily disabled
 
 env:
   FOX_MAINTAINER_PATCH_VERSION: 1
