@@ -15,16 +15,9 @@ on:
         options:
           - With cache /out
           - Without cache /out
-      decompile_only:
-        description: 'Only decompile existing boot.img (skip build)'
-        required: false
-        default: false
-        type: boolean
 
 env:
-  FOX_MAINTAINER_PATCH_VERSION: 1
   DEVICE: deviant
-  PLATFORM: mt6785
   CCACHE_DIR: /tmp/ccache
 
 jobs:
@@ -35,7 +28,7 @@ jobs:
     - name: Checkout device tree
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        fetch-depth: 1
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Free disk space
@@ -63,14 +56,47 @@ jobs:
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
-        git config --global color.ui auto
+
+    - name: Get current week
+      id: get-date
+      run: echo "week=$(date -u '+%Y-W%W')" >> $GITHUB_OUTPUT
+
+    - name: Cache OrangeFox source
+      uses: actions/cache@v4
+      id: cache-source
+      with:
+        path: |
+          ~/OrangeFox/fox_12.1/.repo
+          ~/OrangeFox/fox_12.1/bootable
+          ~/OrangeFox/fox_12.1/build
+          ~/OrangeFox/fox_12.1/system
+          ~/OrangeFox/fox_12.1/vendor
+          ~/OrangeFox/fox_12.1/external
+          ~/OrangeFox/fox_12.1/frameworks
+          ~/OrangeFox/fox_12.1/hardware
+          ~/OrangeFox/fox_12.1/packages
+          ~/OrangeFox/fox_12.1/art
+          ~/OrangeFox/fox_12.1/bionic
+          ~/OrangeFox/fox_12.1/dalvik
+          ~/OrangeFox/fox_12.1/libcore
+          ~/OrangeFox/fox_12.1/libnativehelper
+          ~/OrangeFox/fox_12.1/pdk
+          ~/OrangeFox/fox_12.1/prebuilts
+          ~/OrangeFox/fox_12.1/sdk
+          ~/OrangeFox/fox_12.1/tools
+        key: fox-source-12.1-${{ runner.os }}-${{ steps.get-date.outputs.week }}
+        restore-keys: |
+          fox-source-12.1-${{ runner.os }}-
+          fox-source-12.1-
 
     - name: Cache ccache
       uses: actions/cache@v4
       with:
         path: /tmp/ccache
-        key: ccache-${{ env.DEVICE }}-latest
-        restore-keys: ccache-${{ env.DEVICE }}-
+        key: ccache-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
+        restore-keys: |
+          ccache-${{ env.DEVICE }}-
+          ccache-
 
     - name: Configure ccache
       run: |
@@ -83,11 +109,12 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/OrangeFox/fox_12.1/out
-        key: out-${{ env.DEVICE }}-latest
-        restore-keys: out-${{ env.DEVICE }}-
+        key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
+        restore-keys: |
+          out-${{ env.DEVICE }}-
+          out-
 
     - name: Sync OrangeFox source
-      if: github.event.inputs.decompile_only != 'true'
       run: |
         echo "=== Creating OrangeFox directories ==="
         mkdir -p $HOME/OrangeFox/fox_12.1
@@ -101,8 +128,10 @@ jobs:
         ./orangefox_sync.sh --branch 12.1 --path $HOME/OrangeFox/fox_12.1
 
         echo "=== Verifying build directory ==="
-        ls -la $HOME/OrangeFox/
-        ls -la $HOME/OrangeFox/fox_12.1/ 2>/dev/null || echo "ERROR: fox_12.1 directory not found!"
+        if [ ! -d "$HOME/OrangeFox/fox_12.1" ]; then
+          echo "ERROR: fox_12.1 directory not found!"
+          exit 1
+        fi
 
         echo "=== Checking for build/envsetup.sh ==="
         if [ -f "$HOME/OrangeFox/fox_12.1/build/envsetup.sh" ]; then
@@ -112,97 +141,73 @@ jobs:
           exit 1
         fi
 
-    - name: Clone device tree
-      if: github.event.inputs.decompile_only != 'true'
+    - name: Setup device tree
       run: |
         echo "=== Device tree setup ==="
         cd $HOME/OrangeFox/fox_12.1
-        rm -rf device/infinix/${{ env.DEVICE }} 2>/dev/null || true
         mkdir -p device/infinix
 
-        echo "=== Cloning device tree from ${{ github.repository }} ==="
-        git clone https://github.com/${{ github.repository }}.git device/infinix/${{ env.DEVICE }} -b fox_12.1-final --depth=1
+        echo "=== Copying device tree from workspace ==="
+        cp -r "$GITHUB_WORKSPACE" device/infinix/${{ env.DEVICE }}
 
         echo "=== Verifying device tree ==="
+        if [ ! -f "device/infinix/${{ env.DEVICE }}/BoardConfig.mk" ]; then
+          echo "ERROR: BoardConfig.mk not found in device tree!"
+          exit 1
+        fi
         ls -la device/infinix/${{ env.DEVICE }}/
 
     - name: Run pre-build hook (size reduction)
-      if: github.event.inputs.decompile_only != 'true'
       run: |
         echo "=== RUNNING PRE-BUILD HOOK ==="
 
         FOX_SRC="$HOME/OrangeFox/fox_12.1"
-        DEVICE_TREE="$GITHUB_WORKSPACE"
+        DEVICE_TREE="$HOME/OrangeFox/fox_12.1/device/infinix/${{ env.DEVICE }}"
 
         if [ -f "$DEVICE_TREE/pre_build_hook.sh" ]; then
           echo "Found pre_build_hook.sh"
           chmod +x "$DEVICE_TREE/pre_build_hook.sh"
-
-          # Execute pre-build hook
           source "$DEVICE_TREE/pre_build_hook.sh" "$FOX_SRC"
         else
           echo "WARNING: pre_build_hook.sh not found"
         fi
 
     - name: Building recovery
-      if: github.event.inputs.decompile_only != 'true'
+      id: build
       run: |
         cd $HOME/OrangeFox/fox_12.1
-        set +e
+
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         export CCACHE_DIR=/tmp/ccache
-        set -e
 
         BUILD_TYPE="${{ github.event.inputs.build_type || 'With cache /out' }}"
 
         lunch twrp_${{ env.DEVICE }}-eng
 
-        if [ "$BUILD_TYPE" = "With cache /out" ]; then
-          echo "=== Build with cached /out ==="
-        else
+        if [ "$BUILD_TYPE" = "Without cache /out" ]; then
           echo "=== Build without cached /out (Fresh) ==="
           make clean
+        else
+          echo "=== Build with cached /out ==="
         fi
 
         mka adbd bootimage -j$(nproc --all)
 
         ccache -s
-      continue-on-error: true
 
-    - name: Verify boot image size
-      if: github.event.inputs.decompile_only != 'true'
-      run: |
-        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
-
-        if [ -f "$BOOT_IMG" ]; then
-          SIZE=$(stat -c %s "$BOOT_IMG")
-          SIZE_MB=$(( SIZE / 1024 / 1024 ))
-          TARGET=33554432
-          TARGET_MB=32
-
-          echo "=== BOOT IMAGE SIZE CHECK ==="
-          echo "Actual size: $SIZE bytes ($SIZE_MB MB)"
-          echo "Target size: $TARGET bytes ($TARGET_MB MB)"
-
-          if [ $SIZE -le $TARGET ]; then
-            echo ""
-            echo "✓ SUCCESS! Boot image fits in 32MB partition"
-            echo "  Margin: $(( TARGET - SIZE )) bytes ($(( (TARGET - SIZE) / 1024 )) KB)"
-          else
-            echo ""
-            echo "✗ FAILED! Boot image still too large"
-            echo "  Overflow: $(( SIZE - TARGET )) bytes ($(( (SIZE - TARGET) / 1024 )) KB)"
-            exit 1
-          fi
-        else
-          echo "ERROR: boot.img not found"
+        # Verify build success
+        BOOT_IMG="out/target/product/${{ env.DEVICE }}/boot.img"
+        if [ ! -f "$BOOT_IMG" ]; then
+          echo "ERROR: boot.img not built!"
           exit 1
         fi
+        echo "✓ boot.img built successfully"
+        echo "boot_img_path=$HOME/OrangeFox/fox_12.1/$BOOT_IMG" >> $GITHUB_OUTPUT
 
-    - name: Install magiskboot for decompiling
+    - name: Install magiskboot
       run: |
         echo "=== Installing magiskboot ==="
         # Download latest Magisk APK
@@ -219,199 +224,149 @@ jobs:
         chmod +x magiskboot
         sudo mv magiskboot /usr/local/bin/
 
-        # Verify
-        magiskboot --help || echo "magiskboot installed"
-
-    - name: Decompile boot.img
-      run: |
-        echo "=== Decompiling boot.img ==="
-
-        BOOT_IMG=""
-
-        # Check for built boot.img
-        if [ -f "$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img" ]; then
-          BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
-          echo "Found built boot.img"
+        # Verify installation
+        if [ -x /usr/local/bin/magiskboot ]; then
+          echo "✓ magiskboot installed successfully"
         else
-          echo "No built boot.img found, checking for existing boot.img..."
-          # Check if there's an existing boot.img in the repo
-          if [ -f "$GITHUB_WORKSPACE/boot.img" ]; then
-            BOOT_IMG="$GITHUB_WORKSPACE/boot.img"
-            echo "Found boot.img in repository"
-          else
-            echo "ERROR: No boot.img found to decompile"
-            exit 1
-          fi
+          echo "✗ magiskboot installation failed"
+          exit 1
         fi
 
-        # Create decompiled directory
-        mkdir -p decompiled
-        cd decompiled
+    - name: Post-build cleanup & size verification
+      run: |
+        echo "=== POST-BUILD CLEANUP WITH MAGISKBOOT ==="
+        echo "Target: Remove unused files to fit 32MB boot partition"
+        echo ""
 
-        # Copy boot.img
+        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
+        TARGET=33554432
+
+        if [ ! -f "$BOOT_IMG" ]; then
+          echo "ERROR: boot.img not found at $BOOT_IMG"
+          exit 1
+        fi
+
+        ORIG_SIZE=$(stat -c %s "$BOOT_IMG")
+        echo "Original boot.img size: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
+        echo ""
+
+        # Create working directory
+        WORK_DIR=$(mktemp -d)
+        cd "$WORK_DIR"
+
+        echo "=== [1/4] Unpacking boot image ==="
         cp "$BOOT_IMG" boot.img
-
-        # Get boot.img info
-        echo "=== Boot Image Info ==="
-        ls -la boot.img
-        file boot.img
-
-        # Decompile using magiskboot
-        echo "=== Extracting with magiskboot ==="
         magiskboot unpack -h boot.img
+        echo ""
 
-        # List extracted files
-        echo "=== Extracted Files ==="
-        ls -la
+        echo "=== [2/4] Removing unused libraries ==="
+        echo "Removing:"
+        echo "  - libchrome.so (Chrome/V8 engine, not used by recovery)"
+        echo "  - libxml2.so (not used by anyone)"
+        echo "  - libnl.so (netlink library, not needed for recovery)"
+        echo "  - libunwindstack.so (debug/stack unwinding)"
+        echo "  - libbacktrace.so (debug/backtrace)"
+        echo "  - libclang_rt.ubsan*.so (UndefinedBehaviorSanitizer, debug only)"
+        echo "  - libcppbor.so (CBOR parsing, orphan)"
+        echo "  - libevent.so (event library, orphan)"
+        echo "  - android.system.wifi.keystore@1.0.so (WiFi keystore, not needed)"
+        echo "  - sbin/magiskboot (already bundled in flashable zip)"
+        echo ""
 
-        # Decompress kernel if compressed
-        if [ -f "kernel" ]; then
-          echo "=== Checking kernel compression ==="
-          file kernel
+        # Remove libraries
+        LIBRARIES_TO_REMOVE=(
+            "system/lib64/libchrome.so"
+            "system/lib64/libxml2.so"
+            "system/lib64/libnl.so"
+            "system/lib64/libunwindstack.so"
+            "system/lib64/libbacktrace.so"
+            "system/lib64/libclang_rt.ubsan_standalone-aarch64-android.so"
+            "system/lib64/libcppbor.so"
+            "system/lib64/libevent.so"
+            "system/lib64/android.system.wifi.keystore@1.0.so"
+            "sbin/magiskboot"
+        )
 
-          # Try to decompress
-          magiskboot decompress kernel kernel_unpacked 2>/dev/null || cp kernel kernel_unpacked
-          ls -la kernel*
+        for lib in "${LIBRARIES_TO_REMOVE[@]}"; do
+            echo "  Removing: $lib"
+            magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null || true
+        done
+
+        echo ""
+        echo "=== [3/4] Cleaning terminfo ==="
+        echo "Keeping only essential terminfo: linux, vt100, vt102, xterm, xterm-256color"
+        echo ""
+
+        # Extract terminfo files we want to keep
+        mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
+
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null || true
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" 2>/dev/null || true
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" 2>/dev/null || true
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null || true
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null || true
+
+        # Remove entire terminfo directory
+        magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null || true
+
+        # Recreate terminfo with only essential files
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo"
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l"
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v"
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x"
+
+        [ -f terminfo_keep/l/linux ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/l/linux terminfo_keep/l/linux"
+        [ -f terminfo_keep/v/vt100 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt100 terminfo_keep/v/vt100"
+        [ -f terminfo_keep/v/vt102 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt102 terminfo_keep/v/vt102"
+        [ -f terminfo_keep/x/xterm ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm terminfo_keep/x/xterm"
+        [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color"
+
+        echo ""
+        echo "=== [4/4] Repacking boot image ==="
+        magiskboot repack boot.img new-boot.img
+
+        # Replace original with optimized
+        cp new-boot.img "$BOOT_IMG"
+
+        # Show size comparison
+        NEW_SIZE=$(stat -c %s new-boot.img)
+        SAVED=$((ORIG_SIZE - NEW_SIZE))
+
+        echo ""
+        echo "=============================================="
+        echo "          SIZE COMPARISON SUMMARY"
+        echo "=============================================="
+        echo "  Original: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
+        echo "  New:      $NEW_SIZE bytes ($((NEW_SIZE/1024/1024)) MB)"
+        echo "  Saved:    $SAVED bytes ($((SAVED/1024)) KB)"
+        echo "  Target:   $TARGET bytes (32 MB)"
+        echo "=============================================="
+        echo ""
+
+        if [ $NEW_SIZE -le $TARGET ]; then
+          MARGIN=$(( TARGET - NEW_SIZE ))
+          echo "✓ SUCCESS! Boot image fits in 32MB partition"
+          echo "  Margin: $MARGIN bytes ($(( MARGIN / 1024 )) KB)"
+          echo ""
+          echo "=== POST-BUILD CLEANUP COMPLETE ==="
+        else
+          OVERFLOW=$(( NEW_SIZE - TARGET ))
+          echo "✗ FAILED! Boot image still too large"
+          echo "  Overflow: $OVERFLOW bytes ($(( OVERFLOW / 1024 )) KB)"
+          exit 1
         fi
 
-        # Decompress ramdisk
-        if [ -f "ramdisk.cpio" ]; then
-          echo "=== Extracting ramdisk ==="
-          mkdir -p ramdisk
-          cd ramdisk
-          cpio -idmv < ../ramdisk.cpio 2>&1 | head -50
-          cd ..
-        elif [ -f "ramdisk.gz" ]; then
-          echo "=== Decompressing ramdisk.gz ==="
-          gunzip -c ramdisk.gz > ramdisk.cpio
-          mkdir -p ramdisk
-          cd ramdisk
-          cpio -idmv < ../ramdisk.cpio 2>&1 | head -50
-          cd ..
-        fi
+        # Cleanup
+        cd /
+        rm -rf "$WORK_DIR"
 
-        # Fix permissions for upload-artifact (GitHub Actions can't read restricted dirs)
-        echo "=== Fixing permissions ==="
-        if [ -d "ramdisk" ]; then
-          chmod -R a+rX ramdisk 2>/dev/null || true
-          # Remove symlinks that point to non-existent targets (like /dev, /proc)
-          find ramdisk -type l -exec rm -f {} + 2>/dev/null || true
-        fi
-
-        # Create size analysis
-        echo "=== Creating Size Analysis ==="
-        cd ..
-        python3 << 'PYEOF'
-        import os
-        import json
-
-        def get_dir_size(path):
-            total = 0
-            for dirpath, dirnames, filenames in os.walk(path):
-                for f in filenames:
-                    fp = os.path.join(dirpath, f)
-                    try:
-                        total += os.path.getsize(fp)
-                    except:
-                        pass
-            return total
-
-        analysis = {
-            "boot_img_size": os.path.getsize("decompiled/boot.img") if os.path.exists("decompiled/boot.img") else 0,
-            "components": {}
-        }
-
-        # Analyze decompiled folder
-        for item in os.listdir("decompiled"):
-            path = os.path.join("decompiled", item)
-            if os.path.isfile(path):
-                analysis["components"][item] = {
-                    "size": os.path.getsize(path),
-                    "type": "file"
-                }
-            elif os.path.isdir(path):
-                # Analyze subdirectories
-                subdirs = {}
-                for subitem in os.listdir(path):
-                    subpath = os.path.join(path, subitem)
-                    if os.path.isfile(subpath):
-                        subdirs[subitem] = {
-                            "size": os.path.getsize(subpath),
-                            "type": "file"
-                        }
-                    elif os.path.isdir(subpath):
-                        subdirs[subitem] = {
-                            "size": get_dir_size(subpath),
-                            "type": "directory"
-                        }
-
-                analysis["components"][item] = {
-                    "size": get_dir_size(path),
-                    "type": "directory",
-                    "contents": subdirs
-                }
-
-        # Save analysis
-        with open("decompiled/size_analysis.json", "w") as f:
-            json.dump(analysis, f, indent=2)
-
-        # Print summary
-        print("\n=== SIZE ANALYSIS SUMMARY ===")
-        for name, info in sorted(analysis["components"].items(), key=lambda x: x[1]["size"], reverse=True):
-            size_mb = info["size"] / (1024 * 1024)
-            print(f"{name}: {size_mb:.2f} MB")
-
-        print(f"\nTotal boot.img: {analysis['boot_img_size'] / (1024 * 1024):.2f} MB")
-        PYEOF
-
-        echo "=== Decompilation Complete ==="
-        ls -la decompiled/
-
-    - name: Upload decompiled files
-      uses: actions/upload-artifact@v4
-      with:
-        name: decompiled-boot-${{ env.DEVICE }}
-        path: decompiled/
-        retention-days: 30
-
-    - name: Upload recovery image
+    - name: Upload boot image
       uses: actions/upload-artifact@v4
       with:
         name: OrangeFox-R11.3-${{ env.DEVICE }}-32mb
         path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
         retention-days: 7
-        if-no-files-found: warn
-
-    - name: Push decompiled to branch
-      run: |
-        echo "=== Pushing decompiled files to 'decompiled' branch ==="
-
-        # Configure git
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-
-        # Create or switch to decompiled branch
-        git checkout -B decompiled 2>/dev/null || git checkout decompiled
-
-        # Clean old files (keep .git)
-        find . -maxdepth 1 ! -name '.git' ! -name 'decompiled' ! -name '.' -exec rm -rf {} +
-
-        # Move decompiled contents to root
-        if [ -d "decompiled" ]; then
-          cp -r decompiled/* .
-          rm -rf decompiled
-        fi
-
-        # Add all files
-        git add -A
-
-        # Commit
-        git commit -m "Decompiled boot.img - $(date -u +'%Y-%m-%d %H:%M:%S UTC')" || echo "No changes to commit"
-
-        # Push to decompiled branch
-        git push origin decompiled --force
-
-        echo "=== Pushed to decompiled branch ==="
+        if-no-files-found: error
 
     - name: Upload build log on failure
       uses: actions/upload-artifact@v4
@@ -420,5 +375,6 @@ jobs:
         name: build-error-log
         path: |
           ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/obj/PACKAGING/**/*.log
+          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/*.log
         retention-days: 3
         if-no-files-found: ignore
