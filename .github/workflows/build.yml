@@ -345,8 +345,42 @@ jobs:
         echo "=== [5/5] Repacking boot image ==="
         echo "Input boot.img size: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
         echo "Input ramdisk.cpio size: $RAMDISK_SIZE_AFTER bytes ($((RAMDISK_SIZE_AFTER/1024)) KB)"
-        magiskboot repack boot.img new-boot.img
-
+        echo ""
+        
+        # Repack and capture output to get actual sizes
+        REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1)
+        echo "$REPACK_OUTPUT"
+        echo ""
+        
+        # Extract actual sizes from repack output
+        KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep "KERNEL_SZ" | head -2 | tail -1 | grep -oP '\[\K[0-9]+')
+        RAMDISK_SZ=$(echo "$REPACK_OUTPUT" | grep "RAMDISK_SZ" | head -2 | tail -1 | grep -oP '\[\K[0-9]+')
+        DTB_SZ=$(echo "$REPACK_OUTPUT" | grep "DTB_SZ" | head -2 | tail -1 | grep -oP '\[\K[0-9]+')
+        
+        echo "Extracted sizes:"
+        echo "  KERNEL_SZ:  $KERNEL_SZ bytes"
+        echo "  RAMDISK_SZ: $RAMDISK_SZ bytes"
+        echo "  DTB_SZ:     $DTB_SZ bytes"
+        echo ""
+        
+        # Calculate padded sizes (align to page size 2048)
+        PAGE_SIZE=2048
+        KERNEL_PADDED=$(( ((KERNEL_SZ + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE ))
+        RAMDISK_PADDED=$(( ((RAMDISK_SZ + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE ))
+        DTB_PADDED=$(( ((DTB_SZ + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE ))
+        TOTAL_SIZE=$((PAGE_SIZE + KERNEL_PADDED + RAMDISK_PADDED + DTB_PADDED))
+        
+        echo "Padded sizes (page-aligned to $PAGE_SIZE bytes):"
+        echo "  Kernel padded:  $KERNEL_PADDED bytes"
+        echo "  Ramdisk padded: $RAMDISK_PADDED bytes"
+        echo "  DTB padded:     $DTB_PADDED bytes"
+        echo "  Total:          $TOTAL_SIZE bytes ($((TOTAL_SIZE/1024/1024)) MB)"
+        echo ""
+        
+        # Truncate to actual size (remove padding from original)
+        echo "Truncating new-boot.img to actual content size..."
+        truncate -s $TOTAL_SIZE new-boot.img
+        
         # Replace original with optimized
         cp new-boot.img "$BOOT_IMG"
 
