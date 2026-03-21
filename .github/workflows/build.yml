@@ -286,11 +286,11 @@ jobs:
 
         echo "=== [2/5] Analyzing ramdisk contents ==="
         echo "Listing files in ramdisk.cpio (first 100 lines):"
-        magiskboot cpio ramdisk.cpio "list" 2>/dev/null | head -100
+        magiskboot cpio ramdisk.cpio ls 2>/dev/null | head -100
         echo ""
         
         echo "Counting total files in ramdisk:"
-        TOTAL_FILES=$(magiskboot cpio ramdisk.cpio "list" 2>/dev/null | wc -l)
+        TOTAL_FILES=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | wc -l)
         echo "Total files: $TOTAL_FILES"
         echo ""
 
@@ -311,7 +311,7 @@ jobs:
         REMOVED_COUNT=0
         for lib in "${LIBRARIES_TO_REMOVE[@]}"; do
             # Check if file exists in ramdisk
-            if magiskboot cpio ramdisk.cpio "list" 2>/dev/null | grep -q "$lib"; then
+            if magiskboot cpio ramdisk.cpio ls 2>/dev/null | grep -q "$lib"; then
                 echo "  ✓ Found & removing: $lib"
                 magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null
                 REMOVED_COUNT=$((REMOVED_COUNT + 1))
@@ -354,7 +354,7 @@ jobs:
         echo ""
 
         echo "Files remaining in ramdisk:"
-        NEW_TOTAL=$(magiskboot cpio ramdisk.cpio "list" 2>/dev/null | wc -l)
+        NEW_TOTAL=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | wc -l)
         echo "Total files after cleanup: $NEW_TOTAL (removed: $((TOTAL_FILES - NEW_TOTAL)))"
         echo ""
 
@@ -388,10 +388,10 @@ jobs:
         echo "$REPACK_OUTPUT"
         echo ""
         
-        # Extract actual sizes from repack output (with validation)
-        KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'KERNEL_SZ\s*\[\K[0-9]+' | head -1)
-        RAMDISK_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'RAMDISK_SZ\s*\[\K[0-9]+' | head -1)
-        DTB_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'DTB_SZ\s*\[\K[0-9]+' | head -1)
+        # Extract actual sizes from repack output (use tail -1 to get REPACK sizes, not UNPACK)
+        KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'KERNEL_SZ\s*\[\K[0-9]+' | tail -1)
+        RAMDISK_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'RAMDISK_SZ\s*\[\K[0-9]+' | tail -1)
+        DTB_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'DTB_SZ\s*\[\K[0-9]+' | tail -1)
         
         # Validate and set defaults
         if [ -z "$KERNEL_SZ" ] || [ -z "$RAMDISK_SZ" ]; then
