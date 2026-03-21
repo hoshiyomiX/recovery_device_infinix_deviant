@@ -24,7 +24,6 @@ on:
 env:
   DEVICE: deviant
   CCACHE_DIR: /tmp/ccache
-  FOX_HOME: $HOME/OrangeFox/fox_12.1
 
 jobs:
   build:
@@ -72,7 +71,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-source
       with:
-        path: ${{ env.FOX_HOME }}
+        path: ~/OrangeFox/fox_12.1
         key: fox-source-12.1-${{ steps.get-date.outputs.week }}
         restore-keys: |
           fox-source-12.1-
@@ -99,7 +98,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-out
       with:
-        path: ${{ env.FOX_HOME }}/out
+        path: ~/OrangeFox/fox_12.1/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
         restore-keys: |
           out-${{ env.DEVICE }}-
@@ -113,24 +112,24 @@ jobs:
       run: |
         echo "=== Source cache miss or force refresh - syncing... ==="
         echo "=== Creating OrangeFox directories ==="
-        mkdir -p $FOX_HOME
-        cd $HOME/OrangeFox
+        mkdir -p $HOME/OrangeFox/fox_12.1
+        mkdir -p $HOME/OrangeFox/sync
+        cd $HOME/OrangeFox/sync
 
         echo "=== Cloning OrangeFox sync script ==="
-        git clone https://gitlab.com/OrangeFox/sync.git sync --depth=1
-        cd sync
+        git clone https://gitlab.com/OrangeFox/sync.git . --depth=1
 
         echo "=== Running OrangeFox sync (branch 12.1) ==="
-        ./orangefox_sync.sh --branch 12.1 --path $FOX_HOME
+        ./orangefox_sync.sh --branch 12.1 --path $HOME/OrangeFox/fox_12.1
 
         echo "=== Verifying build directory ==="
-        if [ ! -d "$FOX_HOME" ]; then
+        if [ ! -d "$HOME/OrangeFox/fox_12.1" ]; then
           echo "ERROR: fox_12.1 directory not found!"
           exit 1
         fi
 
         echo "=== Checking for build/envsetup.sh ==="
-        if [ -f "$FOX_HOME/build/envsetup.sh" ]; then
+        if [ -f "$HOME/OrangeFox/fox_12.1/build/envsetup.sh" ]; then
           echo "✓ build/envsetup.sh found!"
         else
           echo "ERROR: build/envsetup.sh NOT found!"
@@ -145,19 +144,19 @@ jobs:
       run: |
         echo "✓ Source cache HIT - skipping sync"
         echo "Cache key: fox-source-12.1-${{ steps.get-date.outputs.week }}"
-        ls -la $FOX_HOME/ 2>/dev/null || echo "Source directory exists"
+        ls -la $HOME/OrangeFox/fox_12.1/ 2>/dev/null || echo "Source directory exists"
 
     - name: Save OrangeFox source cache
       if: steps.sync-source.outputs.source_synced == 'true'
       uses: actions/cache/save@v4
       with:
-        path: ${{ env.FOX_HOME }}
+        path: ~/OrangeFox/fox_12.1
         key: fox-source-12.1-${{ steps.get-date.outputs.week }}
 
     - name: Setup device tree
       run: |
         echo "=== Device tree setup ==="
-        cd $FOX_HOME
+        cd $HOME/OrangeFox/fox_12.1
         mkdir -p device/infinix
 
         echo "=== Copying device tree from workspace ==="
@@ -173,7 +172,7 @@ jobs:
     - name: Building recovery
       id: build
       run: |
-        cd $FOX_HOME
+        cd $HOME/OrangeFox/fox_12.1
 
         set +e
         source build/envsetup.sh
@@ -199,7 +198,7 @@ jobs:
         ccache -s
 
         # Verify build success
-        BOOT_IMG="$FOX_HOME/out/target/product/${{ env.DEVICE }}/boot.img"
+        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
         if [ ! -f "$BOOT_IMG" ]; then
           echo "ERROR: boot.img not built!"
           exit 1
@@ -222,7 +221,7 @@ jobs:
     - name: Save build output
       uses: actions/cache/save@v4
       with:
-        path: ${{ env.FOX_HOME }}/out
+        path: ~/OrangeFox/fox_12.1/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
 
     - name: Install magiskboot
@@ -256,7 +255,7 @@ jobs:
         echo "Target: Remove unused files to fit 32MB boot partition"
         echo ""
 
-        BOOT_IMG="$FOX_HOME/out/target/product/${{ env.DEVICE }}/boot.img"
+        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
         TARGET=33554432
 
         if [ ! -f "$BOOT_IMG" ]; then
@@ -468,7 +467,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: OrangeFox-R11.3-${{ env.DEVICE }}-32mb
-        path: ${{ env.FOX_HOME }}/out/target/product/${{ env.DEVICE }}/boot.img
+        path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
         retention-days: 7
         if-no-files-found: error
 
@@ -478,7 +477,7 @@ jobs:
       with:
         name: build-error-log
         path: |
-          ${{ env.FOX_HOME }}/out/target/product/${{ env.DEVICE }}/obj/PACKAGING/**/*.log
-          ${{ env.FOX_HOME }}/out/target/product/${{ env.DEVICE }}/*.log
+          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/obj/PACKAGING/**/*.log
+          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/*.log
         retention-days: 3
         if-no-files-found: ignore
