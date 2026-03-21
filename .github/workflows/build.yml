@@ -198,6 +198,24 @@ jobs:
         echo "boot_img_path=$HOME/OrangeFox/fox_12.1/$BOOT_IMG" >> $GITHUB_OUTPUT
       continue-on-error: true
 
+    - name: Save ccache
+      if: |
+        github.event.inputs.force_refresh_cache != 'true' &&
+        steps.cache-ccache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/ccache
+        key: ccache-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
+
+    - name: Save build output
+      if: |
+        github.event.inputs.force_refresh_cache != 'true' &&
+        steps.cache-out.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/OrangeFox/fox_12.1/out
+        key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
+
     - name: Install magiskboot
       run: |
         echo "=== Installing magiskboot ==="
