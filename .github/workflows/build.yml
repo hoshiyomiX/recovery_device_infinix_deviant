@@ -157,31 +157,18 @@ jobs:
         fi
         ls -la device/infinix/${{ env.DEVICE }}/
 
-    - name: Run pre-build hook (size reduction)
-      run: |
-        echo "=== RUNNING PRE-BUILD HOOK ==="
-
-        FOX_SRC="$HOME/OrangeFox/fox_12.1"
-        DEVICE_TREE="$HOME/OrangeFox/fox_12.1/device/infinix/${{ env.DEVICE }}"
-
-        if [ -f "$DEVICE_TREE/pre_build_hook.sh" ]; then
-          echo "Found pre_build_hook.sh"
-          chmod +x "$DEVICE_TREE/pre_build_hook.sh"
-          source "$DEVICE_TREE/pre_build_hook.sh" "$FOX_SRC"
-        else
-          echo "WARNING: pre_build_hook.sh not found"
-        fi
-
     - name: Building recovery
       id: build
       run: |
         cd $HOME/OrangeFox/fox_12.1
 
+        set +e
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         export CCACHE_DIR=/tmp/ccache
+        set -e
 
         BUILD_TYPE="${{ github.event.inputs.build_type || 'With cache /out' }}"
 
