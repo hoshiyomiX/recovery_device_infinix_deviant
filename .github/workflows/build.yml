@@ -255,25 +255,18 @@ jobs:
         
         echo "=== [8/9] Removing non-critical tools ==="
         # === KEEP ALL TA FILES INTACT - Required for TEE functionality ===
+        # === KEEP gnutar - GNU tar has more features than toybox tar ===
 
-        # Remove gnutar - toybox already provides tar
-        magiskboot cpio ramdisk.cpio "rm sbin/gnutar" 2>/dev/null && echo "  ✓ Removed gnutar (toybox has tar)"
-
-        # Remove nano editor - not critical for recovery
+        # Remove nano editor - toybox has vi
         magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null && echo "  ✓ Removed nano editor"
         magiskboot cpio ramdisk.cpio "rm sbin/nano" 2>/dev/null
 
         # Remove ps binary - toybox provides ps
         magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null && echo "  ✓ Removed ps binary (toybox has ps)"
 
-        # Touchscreen firmware - not essential for recovery
-        magiskboot cpio ramdisk.cpio "rm vendor/firmware/novatek_ts_fw.bin" 2>/dev/null && echo "  ✓ Removed touchscreen FW"
-        magiskboot cpio ramdisk.cpio "rm vendor/firmware/novatek_ts_mp.bin" 2>/dev/null && echo "  ✓ Removed touchscreen FW (MP)"
-
-        # Unused tools
+        # Unused tools (toybox provides alternatives)
         magiskboot cpio ramdisk.cpio "rm system/bin/bc" 2>/dev/null
         magiskboot cpio ramdisk.cpio "rm system/bin/awk" 2>/dev/null
-        magiskboot cpio ramdisk.cpio "rm system/bin/lzma" 2>/dev/null
         
         echo "=== [9/9] Repacking boot image ==="
         REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1)
