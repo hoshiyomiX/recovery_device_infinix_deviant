@@ -247,6 +247,11 @@ jobs:
         magiskboot unpack -h boot.img
         echo ""
 
+        # Check ramdisk size BEFORE cleanup
+        RAMDISK_SIZE_BEFORE=$(stat -c %s ramdisk.cpio 2>/dev/null || echo "0")
+        echo "Ramdisk.cpio size BEFORE cleanup: $RAMDISK_SIZE_BEFORE bytes ($((RAMDISK_SIZE_BEFORE/1024)) KB)"
+        echo ""
+
         echo "=== [2/5] Analyzing ramdisk contents ==="
         echo "Listing files in ramdisk.cpio (first 100 lines):"
         magiskboot cpio ramdisk.cpio "list" 2>/dev/null | head -100
@@ -321,7 +326,25 @@ jobs:
         echo "Total files after cleanup: $NEW_TOTAL (removed: $((TOTAL_FILES - NEW_TOTAL)))"
         echo ""
 
+        # Check ramdisk size AFTER cleanup
+        RAMDISK_SIZE_AFTER=$(stat -c %s ramdisk.cpio 2>/dev/null || echo "0")
+        RAMDISK_SAVED=$((RAMDISK_SIZE_BEFORE - RAMDISK_SIZE_AFTER))
+        echo "Ramdisk.cpio size AFTER cleanup: $RAMDISK_SIZE_AFTER bytes ($((RAMDISK_SIZE_AFTER/1024)) KB)"
+        echo "Ramdisk saved: $RAMDISK_SAVED bytes ($((RAMDISK_SAVED/1024)) KB)"
+        echo ""
+
+        if [ "$RAMDISK_SAVED" -le 0 ]; then
+          echo "⚠ WARNING: Ramdisk size did not decrease! Cleanup may not have worked."
+          echo "This could mean:"
+          echo "  1. Target files don't exist in ramdisk"
+          echo "  2. Files are in different locations"
+          echo "  3. Ramdisk is compressed (need to decompress first)"
+        fi
+        echo ""
+
         echo "=== [5/5] Repacking boot image ==="
+        echo "Input boot.img size: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
+        echo "Input ramdisk.cpio size: $RAMDISK_SIZE_AFTER bytes ($((RAMDISK_SIZE_AFTER/1024)) KB)"
         magiskboot repack boot.img new-boot.img
 
         # Replace original with optimized
