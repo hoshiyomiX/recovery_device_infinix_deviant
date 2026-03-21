@@ -224,6 +224,14 @@ jobs:
         path: ~/OrangeFox/fox_12.1/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
 
+    - name: Upload original boot image (before cleanup)
+      uses: actions/upload-artifact@v4
+      with:
+        name: boot-img-original
+        path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
+        retention-days: 7
+        if-no-files-found: error
+
     - name: Install magiskboot
       run: |
         echo "=== Installing magiskboot ==="
