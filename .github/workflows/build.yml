@@ -253,17 +253,34 @@ jobs:
           magiskboot cpio ramdisk.cpio "rm $doc" 2>/dev/null
         done
         
-        echo "=== [8/9] Removing non-critical TAs (DRM, Video, Camera, TUI) ==="
-        # DRM/Video TAs - not needed for recovery
-        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/07060000000000000000000000007169.ta" 2>/dev/null && echo "  ✓ Removed DRM/AVC TA"
-        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/08070000000000000000000000008270.ta" 2>/dev/null && echo "  ✓ Removed VP9 TA"
-        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/07407000000000000000000000000000.ta" 2>/dev/null && echo "  ✓ Removed Camera Sensor TA"
-        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/05120000000000000000000000000000.ta" 2>/dev/null && echo "  ✓ Removed Trusted UI TA"
-        
+        echo "=== [8/9] Removing non-critical TAs and tools ==="
+        # === CRITICAL: DO NOT REMOVE keymaster TA (c09c9c5daa504b78b0e46eda61556c3a.ta) ===
+        # It's required for FBE decryption, PIN/password unlock, and key derivation
+
+        # Non-critical TAs (safe to remove for recovery mode)
+        # HDCP DRM - not needed for recovery/decryption
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/5020170115e016302017012521300000.ta" 2>/dev/null && echo "  ✓ Removed HDCP TA"
+        # Secure ISP - camera related, not needed for recovery
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/0f5eed3c3b5a47afacca69a84bf0efad.ta" 2>/dev/null && echo "  ✓ Removed Secure ISP TA"
+        # SPI TEE - secure element/payment, not needed for recovery
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/93feffccd8ca11e796c7c7a21acb4932.ta" 2>/dev/null && echo "  ✓ Removed SPI TEE TA"
+        # Unknown small TA
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/06090000000000000000000000000000.ta" 2>/dev/null && echo "  ✓ Removed unknown TA"
+
+        # Remove gnutar - toybox already provides tar
+        magiskboot cpio ramdisk.cpio "rm sbin/gnutar" 2>/dev/null && echo "  ✓ Removed gnutar (toybox has tar)"
+
+        # Remove nano editor - not critical for recovery
+        magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null && echo "  ✓ Removed nano editor"
+        magiskboot cpio ramdisk.cpio "rm sbin/nano" 2>/dev/null
+
+        # Remove ps binary - toybox provides ps
+        magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null && echo "  ✓ Removed ps binary (toybox has ps)"
+
         # Touchscreen firmware - not essential for recovery
         magiskboot cpio ramdisk.cpio "rm vendor/firmware/novatek_ts_fw.bin" 2>/dev/null && echo "  ✓ Removed touchscreen FW"
         magiskboot cpio ramdisk.cpio "rm vendor/firmware/novatek_ts_mp.bin" 2>/dev/null && echo "  ✓ Removed touchscreen FW (MP)"
-        
+
         # Unused tools
         magiskboot cpio ramdisk.cpio "rm system/bin/bc" 2>/dev/null
         magiskboot cpio ramdisk.cpio "rm system/bin/awk" 2>/dev/null
