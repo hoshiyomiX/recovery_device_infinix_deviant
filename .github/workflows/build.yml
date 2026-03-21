@@ -15,6 +15,11 @@ on:
         options:
           - With cache /out
           - Without cache /out
+      force_refresh_cache:
+        description: 'Force refresh all caches (ignore existing cache)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   DEVICE: deviant
@@ -62,35 +67,19 @@ jobs:
       run: echo "week=$(date -u '+%Y-W%W')" >> $GITHUB_OUTPUT
 
     - name: Cache OrangeFox source
+      if: github.event.inputs.force_refresh_cache != 'true'
       uses: actions/cache@v4
       id: cache-source
       with:
-        path: |
-          ~/OrangeFox/fox_12.1/.repo
-          ~/OrangeFox/fox_12.1/bootable
-          ~/OrangeFox/fox_12.1/build
-          ~/OrangeFox/fox_12.1/system
-          ~/OrangeFox/fox_12.1/vendor
-          ~/OrangeFox/fox_12.1/external
-          ~/OrangeFox/fox_12.1/frameworks
-          ~/OrangeFox/fox_12.1/hardware
-          ~/OrangeFox/fox_12.1/packages
-          ~/OrangeFox/fox_12.1/art
-          ~/OrangeFox/fox_12.1/bionic
-          ~/OrangeFox/fox_12.1/dalvik
-          ~/OrangeFox/fox_12.1/libcore
-          ~/OrangeFox/fox_12.1/libnativehelper
-          ~/OrangeFox/fox_12.1/pdk
-          ~/OrangeFox/fox_12.1/prebuilts
-          ~/OrangeFox/fox_12.1/sdk
-          ~/OrangeFox/fox_12.1/tools
-        key: fox-source-12.1-${{ runner.os }}-${{ steps.get-date.outputs.week }}
+        path: ~/OrangeFox/fox_12.1
+        key: fox-source-12.1-${{ steps.get-date.outputs.week }}
         restore-keys: |
-          fox-source-12.1-${{ runner.os }}-
           fox-source-12.1-
 
     - name: Cache ccache
+      if: github.event.inputs.force_refresh_cache != 'true'
       uses: actions/cache@v4
+      id: cache-ccache
       with:
         path: /tmp/ccache
         key: ccache-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
@@ -105,8 +94,9 @@ jobs:
         ccache -z
 
     - name: Cache build output
-      if: github.event.inputs.build_type == 'With cache /out'
+      if: github.event.inputs.force_refresh_cache != 'true'
       uses: actions/cache@v4
+      id: cache-out
       with:
         path: ~/OrangeFox/fox_12.1/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
@@ -115,7 +105,11 @@ jobs:
           out-
 
     - name: Sync OrangeFox source
+      if: |
+        steps.cache-source.outputs.cache-hit != 'true' || 
+        github.event.inputs.force_refresh_cache == 'true'
       run: |
+        echo "=== Source cache miss or force refresh - syncing... ==="
         echo "=== Creating OrangeFox directories ==="
         mkdir -p $HOME/OrangeFox/fox_12.1
         cd $HOME/OrangeFox
@@ -140,6 +134,15 @@ jobs:
           echo "ERROR: build/envsetup.sh NOT found!"
           exit 1
         fi
+
+    - name: Source cache hit info
+      if: |
+        steps.cache-source.outputs.cache-hit == 'true' && 
+        github.event.inputs.force_refresh_cache != 'true'
+      run: |
+        echo "✓ Source cache HIT - skipping sync"
+        echo "Cache key: fox-source-12.1-${{ steps.get-date.outputs.week }}"
+        ls -la $HOME/OrangeFox/fox_12.1/ 2>/dev/null || echo "Source directory exists"
 
     - name: Setup device tree
       run: |
