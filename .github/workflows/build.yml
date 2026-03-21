@@ -279,7 +279,7 @@ jobs:
         WORK_DIR=$(mktemp -d)
         cd "$WORK_DIR"
 
-        echo "=== [1/9] Unpacking boot image ==="
+        echo "=== [1/8] Unpacking boot image ==="
         cp "$BOOT_IMG" boot.img
         if ! magiskboot unpack -h boot.img; then
           echo "ERROR: Failed to unpack boot.img"
@@ -292,17 +292,13 @@ jobs:
         echo "Ramdisk.cpio size BEFORE cleanup: $RAMDISK_SIZE_BEFORE bytes ($((RAMDISK_SIZE_BEFORE/1024)) KB)"
         echo ""
 
-        echo "=== [2/9] Analyzing ramdisk contents ==="
-        echo "Listing files in ramdisk.cpio (first 100 lines):"
-        magiskboot cpio ramdisk.cpio ls 2>/dev/null | head -100
-        echo ""
-        
+        echo "=== [2/8] Analyzing ramdisk contents ==="
         echo "Counting total files in ramdisk:"
         TOTAL_FILES=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | wc -l)
         echo "Total files: $TOTAL_FILES"
         echo ""
 
-        echo "=== [3/9] Removing unused libraries ==="
+        echo "=== [3/8] Removing unused libraries ==="
         LIBRARIES_TO_REMOVE=(
             "system/lib64/libchrome.so"
             "system/lib64/libxml2.so"
@@ -330,8 +326,7 @@ jobs:
         echo "Total libraries removed: $REMOVED_COUNT"
         echo ""
 
-        echo "=== [4/9] Cleaning terminfo ==="
-        echo "Extracting essential terminfo files..."
+        echo "=== [4/8] Cleaning terminfo (keep essential) ==="
         mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
 
         magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null || echo "  linux: not found"
@@ -340,14 +335,8 @@ jobs:
         magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null || echo "  xterm: not found"
         magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null || echo "  xterm-256color: not found"
 
-        echo "Files extracted for keeping:"
-        ls -la terminfo_keep/*/ 2>/dev/null || echo "  No terminfo files found"
-        echo ""
-
-        echo "Removing entire terminfo directory..."
         magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null || echo "  terminfo directory not found"
 
-        echo "Recreating terminfo with essential files only..."
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo"
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l"
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v"
@@ -360,7 +349,7 @@ jobs:
         [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" && echo "  + xterm-256color"
         echo ""
 
-        echo "=== [5/9] Removing extra themes (keeping only Default) ==="
+        echo "=== [5/8] Removing extra themes (keep Default only) ==="
         THEMES_TO_REMOVE=(
             "twres/images/Black"
             "twres/images/Cinnamon"
@@ -394,7 +383,6 @@ jobs:
         THEMES_REMOVED=0
         for theme in "${THEMES_TO_REMOVE[@]}"; do
             if magiskboot cpio ramdisk.cpio "exists $theme" 2>/dev/null; then
-                echo "  ✓ Removing theme: $theme"
                 magiskboot cpio ramdisk.cpio "rm -r $theme" 2>/dev/null
                 THEMES_REMOVED=$((THEMES_REMOVED + 1))
             fi
@@ -402,7 +390,7 @@ jobs:
         echo "Total themes removed: $THEMES_REMOVED (keeping Default only)"
         echo ""
 
-        echo "=== [6/9] Removing extra fonts (keeping only Roboto-Regular) ==="
+        echo "=== [6/8] Removing extra fonts (keep Roboto-Regular.ttf only) ==="
         FONTS_TO_REMOVE=(
             "twres/fonts/Amatic.ttf"
             "twres/fonts/Chococooky.ttf"
@@ -423,7 +411,6 @@ jobs:
         FONTS_REMOVED=0
         for font in "${FONTS_TO_REMOVE[@]}"; do
             if magiskboot cpio ramdisk.cpio "exists $font" 2>/dev/null; then
-                echo "  ✓ Removing font: $font"
                 magiskboot cpio ramdisk.cpio "rm $font" 2>/dev/null
                 FONTS_REMOVED=$((FONTS_REMOVED + 1))
             fi
@@ -431,7 +418,7 @@ jobs:
         echo "Total fonts removed: $FONTS_REMOVED (keeping Roboto-Regular.ttf)"
         echo ""
 
-        echo "=== [7/9] Removing extra languages (keeping only English) ==="
+        echo "=== [7/8] Removing extra languages (keep en.xml only) ==="
         LANGUAGES_TO_REMOVE=(
             "twres/languages/cs.xml"
             "twres/languages/de.xml"
@@ -450,7 +437,6 @@ jobs:
         LANGS_REMOVED=0
         for lang in "${LANGUAGES_TO_REMOVE[@]}"; do
             if magiskboot cpio ramdisk.cpio "exists $lang" 2>/dev/null; then
-                echo "  ✓ Removing language: $lang"
                 magiskboot cpio ramdisk.cpio "rm $lang" 2>/dev/null
                 LANGS_REMOVED=$((LANGS_REMOVED + 1))
             fi
@@ -458,40 +444,16 @@ jobs:
         echo "Total languages removed: $LANGS_REMOVED (keeping en.xml)"
         echo ""
 
-        echo "=== [8/9] Removing non-essential files ==="
-        # Theme config files
-        magiskboot cpio ramdisk.cpio "rm -r twres/themes/sed" 2>/dev/null && echo "  ✓ Removed twres/themes/sed"
-        magiskboot cpio ramdisk.cpio "rm -r twres/themes/styles" 2>/dev/null && echo "  ✓ Removed twres/themes/styles"
-        magiskboot cpio ramdisk.cpio "rm twres/themes/accent.xml" 2>/dev/null && echo "  ✓ Removed accent.xml"
-        magiskboot cpio ramdisk.cpio "rm twres/themes/action.xml" 2>/dev/null && echo "  ✓ Removed action.xml"
-        magiskboot cpio ramdisk.cpio "rm twres/themes/font.xml" 2>/dev/null && echo "  ✓ Removed font.xml"
-        magiskboot cpio ramdisk.cpio "rm twres/themes/navbar.xml" 2>/dev/null && echo "  ✓ Removed navbar.xml"
-        magiskboot cpio ramdisk.cpio "rm twres/themes/style.xml" 2>/dev/null && echo "  ✓ Removed style.xml"
-        
-        # Extra text files
-        magiskboot cpio ramdisk.cpio "rm twres/credits.txt" 2>/dev/null && echo "  ✓ Removed credits.txt"
-        magiskboot cpio ramdisk.cpio "rm twres/changelog.txt" 2>/dev/null && echo "  ✓ Removed changelog.txt"
-        magiskboot cpio ramdisk.cpio "rm twres/translators.txt" 2>/dev/null && echo "  ✓ Removed translators.txt"
-        
-        # Timestamp and file list files
+        echo "=== [8/8] Removing documentation and large TA file ==="
+        # Documentation/file lists
         magiskboot cpio ramdisk.cpio "rm ramdisk-files.sha256sum" 2>/dev/null && echo "  ✓ Removed ramdisk-files.sha256sum"
         magiskboot cpio ramdisk.cpio "rm ramdisk-files.txt" 2>/dev/null && echo "  ✓ Removed ramdisk-files.txt"
-        magiskboot cpio ramdisk.cpio "rm relink_binaries-timestamp" 2>/dev/null && echo "  ✓ Removed relink_binaries-timestamp"
-        magiskboot cpio ramdisk.cpio "rm relink_libraries-timestamp" 2>/dev/null && echo "  ✓ Removed relink_libraries-timestamp"
-        magiskboot cpio ramdisk.cpio "rm relink_vendor_hw_binaries-timestamp" 2>/dev/null && echo "  ✓ Removed relink_vendor_hw_binaries-timestamp"
-        magiskboot cpio ramdisk.cpio "rm twrp_ramdisk-timestamp" 2>/dev/null && echo "  ✓ Removed twrp_ramdisk-timestamp"
+        magiskboot cpio ramdisk.cpio "rm twres/credits.txt" 2>/dev/null && echo "  ✓ Removed twres/credits.txt"
+        magiskboot cpio ramdisk.cpio "rm twres/changelog.txt" 2>/dev/null && echo "  ✓ Removed twres/changelog.txt"
+        magiskboot cpio ramdisk.cpio "rm twres/translators.txt" 2>/dev/null && echo "  ✓ Removed twres/translators.txt"
         
-        # Empty context files
-        magiskboot cpio ramdisk.cpio "rm odm_file_contexts" 2>/dev/null && echo "  ✓ Removed odm_file_contexts"
-        magiskboot cpio ramdisk.cpio "rm odm_property_contexts" 2>/dev/null && echo "  ✓ Removed odm_property_contexts"
-        magiskboot cpio ramdisk.cpio "rm product_file_contexts" 2>/dev/null && echo "  ✓ Removed product_file_contexts"
-        magiskboot cpio ramdisk.cpio "rm product_property_contexts" 2>/dev/null && echo "  ✓ Removed product_property_contexts"
-        magiskboot cpio ramdisk.cpio "rm system_ext_file_contexts" 2>/dev/null && echo "  ✓ Removed system_ext_file_contexts"
-        magiskboot cpio ramdisk.cpio "rm system_ext_property_contexts" 2>/dev/null && echo "  ✓ Removed system_ext_property_contexts"
-        
-        # FFiles/nano (text editor - not essential)
-        magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null && echo "  ✓ Removed FFiles/nano"
-        magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null && echo "  ✓ Removed FFiles/ps"
+        # Large TA file (DRM - not essential for recovery)
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/c09c9c5daa504b78b0e46eda61556c3a.ta" 2>/dev/null && echo "  ✓ Removed large TA file (2.06 MB)"
         echo ""
 
         # Check ramdisk size AFTER cleanup
@@ -501,15 +463,7 @@ jobs:
         echo "Ramdisk saved: $RAMDISK_SAVED bytes ($((RAMDISK_SAVED/1024)) KB)"
         echo ""
 
-        echo "Files remaining in ramdisk:"
-        NEW_TOTAL=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | wc -l)
-        echo "Total files after cleanup: $NEW_TOTAL (removed: $((TOTAL_FILES - NEW_TOTAL)))"
-        echo ""
-
-        echo "=== [9/9] Repacking boot image ==="
-        echo "Input boot.img size: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
-        echo "Input ramdisk.cpio size: $RAMDISK_SIZE_AFTER bytes ($((RAMDISK_SIZE_AFTER/1024)) KB)"
-        echo ""
+        echo "=== Repacking boot image ==="
         
         # Repack and capture output to get actual sizes
         if ! REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1); then
