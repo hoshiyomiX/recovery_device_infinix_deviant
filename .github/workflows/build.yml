@@ -242,26 +242,22 @@ jobs:
         WORK_DIR=$(mktemp -d)
         cd "$WORK_DIR"
 
-        echo "=== [1/4] Unpacking boot image ==="
+        echo "=== [1/5] Unpacking boot image ==="
         cp "$BOOT_IMG" boot.img
         magiskboot unpack -h boot.img
         echo ""
 
-        echo "=== [2/4] Removing unused libraries ==="
-        echo "Removing:"
-        echo "  - libchrome.so (Chrome/V8 engine, not used by recovery)"
-        echo "  - libxml2.so (not used by anyone)"
-        echo "  - libnl.so (netlink library, not needed for recovery)"
-        echo "  - libunwindstack.so (debug/stack unwinding)"
-        echo "  - libbacktrace.so (debug/backtrace)"
-        echo "  - libclang_rt.ubsan*.so (UndefinedBehaviorSanitizer, debug only)"
-        echo "  - libcppbor.so (CBOR parsing, orphan)"
-        echo "  - libevent.so (event library, orphan)"
-        echo "  - android.system.wifi.keystore@1.0.so (WiFi keystore, not needed)"
-        echo "  - sbin/magiskboot (already bundled in flashable zip)"
+        echo "=== [2/5] Analyzing ramdisk contents ==="
+        echo "Listing files in ramdisk.cpio (first 100 lines):"
+        magiskboot cpio ramdisk.cpio "list" 2>/dev/null | head -100
+        echo ""
+        
+        echo "Counting total files in ramdisk:"
+        TOTAL_FILES=$(magiskboot cpio ramdisk.cpio "list" 2>/dev/null | wc -l)
+        echo "Total files: $TOTAL_FILES"
         echo ""
 
-        # Remove libraries
+        echo "=== [3/5] Removing unused libraries ==="
         LIBRARIES_TO_REMOVE=(
             "system/lib64/libchrome.so"
             "system/lib64/libxml2.so"
@@ -275,42 +271,57 @@ jobs:
             "sbin/magiskboot"
         )
 
+        REMOVED_COUNT=0
         for lib in "${LIBRARIES_TO_REMOVE[@]}"; do
-            echo "  Removing: $lib"
-            magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null || true
+            # Check if file exists in ramdisk
+            if magiskboot cpio ramdisk.cpio "list" 2>/dev/null | grep -q "$lib"; then
+                echo "  ✓ Found & removing: $lib"
+                magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null
+                REMOVED_COUNT=$((REMOVED_COUNT + 1))
+            else
+                echo "  - Not found: $lib"
+            fi
         done
-
         echo ""
-        echo "=== [3/4] Cleaning terminfo ==="
-        echo "Keeping only essential terminfo: linux, vt100, vt102, xterm, xterm-256color"
+        echo "Total libraries removed: $REMOVED_COUNT"
         echo ""
 
-        # Extract terminfo files we want to keep
+        echo "=== [4/5] Cleaning terminfo ==="
+        echo "Extracting essential terminfo files..."
         mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
 
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null || true
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null || echo "  linux: not found"
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" 2>/dev/null || echo "  vt100: not found"
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" 2>/dev/null || echo "  vt102: not found"
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null || echo "  xterm: not found"
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null || echo "  xterm-256color: not found"
 
-        # Remove entire terminfo directory
-        magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null || true
+        echo "Files extracted for keeping:"
+        ls -la terminfo_keep/*/ 2>/dev/null || echo "  No terminfo files found"
+        echo ""
 
-        # Recreate terminfo with only essential files
+        echo "Removing entire terminfo directory..."
+        magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null || echo "  terminfo directory not found"
+
+        echo "Recreating terminfo with essential files only..."
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo"
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l"
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v"
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x"
 
-        [ -f terminfo_keep/l/linux ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/l/linux terminfo_keep/l/linux"
-        [ -f terminfo_keep/v/vt100 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt100 terminfo_keep/v/vt100"
-        [ -f terminfo_keep/v/vt102 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt102 terminfo_keep/v/vt102"
-        [ -f terminfo_keep/x/xterm ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm terminfo_keep/x/xterm"
-        [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color"
-
+        [ -f terminfo_keep/l/linux ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/l/linux terminfo_keep/l/linux" && echo "  + linux"
+        [ -f terminfo_keep/v/vt100 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" && echo "  + vt100"
+        [ -f terminfo_keep/v/vt102 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" && echo "  + vt102"
+        [ -f terminfo_keep/x/xterm ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm terminfo_keep/x/xterm" && echo "  + xterm"
+        [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" && echo "  + xterm-256color"
         echo ""
-        echo "=== [4/4] Repacking boot image ==="
+
+        echo "Files remaining in ramdisk:"
+        NEW_TOTAL=$(magiskboot cpio ramdisk.cpio "list" 2>/dev/null | wc -l)
+        echo "Total files after cleanup: $NEW_TOTAL (removed: $((TOTAL_FILES - NEW_TOTAL)))"
+        echo ""
+
+        echo "=== [5/5] Repacking boot image ==="
         magiskboot repack boot.img new-boot.img
 
         # Replace original with optimized
