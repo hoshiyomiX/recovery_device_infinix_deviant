@@ -279,7 +279,7 @@ jobs:
         WORK_DIR=$(mktemp -d)
         cd "$WORK_DIR"
 
-        echo "=== [1/5] Unpacking boot image ==="
+        echo "=== [1/7] Unpacking boot image ==="
         cp "$BOOT_IMG" boot.img
         if ! magiskboot unpack -h boot.img; then
           echo "ERROR: Failed to unpack boot.img"
@@ -292,7 +292,7 @@ jobs:
         echo "Ramdisk.cpio size BEFORE cleanup: $RAMDISK_SIZE_BEFORE bytes ($((RAMDISK_SIZE_BEFORE/1024)) KB)"
         echo ""
 
-        echo "=== [2/5] Analyzing ramdisk contents ==="
+        echo "=== [2/7] Analyzing ramdisk contents ==="
         echo "Listing files in ramdisk.cpio (first 100 lines):"
         magiskboot cpio ramdisk.cpio ls 2>/dev/null | head -100
         echo ""
@@ -302,7 +302,7 @@ jobs:
         echo "Total files: $TOTAL_FILES"
         echo ""
 
-        echo "=== [3/5] Removing unused libraries ==="
+        echo "=== [3/7] Removing unused libraries ==="
         LIBRARIES_TO_REMOVE=(
             "system/lib64/libchrome.so"
             "system/lib64/libxml2.so"
@@ -331,7 +331,27 @@ jobs:
         echo "Total libraries removed: $REMOVED_COUNT"
         echo ""
 
-        echo "=== [4/5] Cleaning terminfo ==="
+        echo "=== [4/7] Removing non-essential binaries ==="
+        BINARIES_TO_REMOVE=(
+            "system/bin/update_engine_sideload"
+            "system/bin/fastbootd"
+        )
+
+        BIN_REMOVED_COUNT=0
+        for bin in "${BINARIES_TO_REMOVE[@]}"; do
+            if magiskboot cpio ramdisk.cpio "exists $bin" 2>/dev/null; then
+                echo "  ✓ Found & removing: $bin"
+                magiskboot cpio ramdisk.cpio "rm $bin" 2>/dev/null
+                BIN_REMOVED_COUNT=$((BIN_REMOVED_COUNT + 1))
+            else
+                echo "  - Not found: $bin"
+            fi
+        done
+        echo ""
+        echo "Total binaries removed: $BIN_REMOVED_COUNT"
+        echo ""
+
+        echo "=== [5/7] Cleaning terminfo ==="
         echo "Extracting essential terminfo files..."
         mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
 
@@ -361,6 +381,56 @@ jobs:
         [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" && echo "  + xterm-256color"
         echo ""
 
+        echo "=== [6/7] Removing extra themes (keeping only Default) ==="
+        echo "Listing current themes in twres/images..."
+        
+        # List all theme directories
+        THEMES=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | grep -E "^drwx.*twres/images/[^/]+$" || true)
+        echo "Found themes: $THEMES"
+        
+        # Remove each theme directory except Default
+        THEMES_TO_REMOVE=(
+            "twres/images/Black"
+            "twres/images/Cinnamon"
+            "twres/images/DBlack"
+            "twres/images/DCinnamon"
+            "twres/images/DFox"
+            "twres/images/DGoogle"
+            "twres/images/DGreen"
+            "twres/images/DLollipop"
+            "twres/images/DOcean"
+            "twres/images/DOrchid"
+            "twres/images/DPurple"
+            "twres/images/DRed"
+            "twres/images/DSpace"
+            "twres/images/DYellow"
+            "twres/images/Fox"
+            "twres/images/Google"
+            "twres/images/Green"
+            "twres/images/Light"
+            "twres/images/Lollipop"
+            "twres/images/Night"
+            "twres/images/Ocean"
+            "twres/images/Orchid"
+            "twres/images/Purple"
+            "twres/images/Red"
+            "twres/images/Space"
+            "twres/images/Splash"
+            "twres/images/Yellow"
+        )
+        
+        THEMES_REMOVED=0
+        for theme in "${THEMES_TO_REMOVE[@]}"; do
+            if magiskboot cpio ramdisk.cpio "exists $theme" 2>/dev/null; then
+                echo "  ✓ Removing theme: $theme"
+                magiskboot cpio ramdisk.cpio "rm -r $theme" 2>/dev/null
+                THEMES_REMOVED=$((THEMES_REMOVED + 1))
+            fi
+        done
+        echo ""
+        echo "Total themes removed: $THEMES_REMOVED (keeping Default only)"
+        echo ""
+
         echo "Files remaining in ramdisk:"
         NEW_TOTAL=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | wc -l)
         echo "Total files after cleanup: $NEW_TOTAL (removed: $((TOTAL_FILES - NEW_TOTAL)))"
@@ -382,7 +452,7 @@ jobs:
         fi
         echo ""
 
-        echo "=== [5/5] Repacking boot image ==="
+        echo "=== [7/7] Repacking boot image ==="
         echo "Input boot.img size: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
         echo "Input ramdisk.cpio size: $RAMDISK_SIZE_AFTER bytes ($((RAMDISK_SIZE_AFTER/1024)) KB)"
         echo ""
