@@ -310,8 +310,8 @@ jobs:
 
         REMOVED_COUNT=0
         for lib in "${LIBRARIES_TO_REMOVE[@]}"; do
-            # Check if file exists in ramdisk
-            if magiskboot cpio ramdisk.cpio ls 2>/dev/null | grep -q "$lib"; then
+            # Check if file exists in ramdisk using 'exists' command
+            if magiskboot cpio ramdisk.cpio "exists $lib" 2>/dev/null; then
                 echo "  ✓ Found & removing: $lib"
                 magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null
                 REMOVED_COUNT=$((REMOVED_COUNT + 1))
