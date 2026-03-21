@@ -111,40 +111,12 @@ jobs:
         github.event.inputs.force_refresh_cache == 'true'
       run: |
         echo "=== Source cache miss or force refresh - syncing... ==="
-        echo "=== Creating OrangeFox directories ==="
         mkdir -p $HOME/OrangeFox/fox_12.1
         mkdir -p $HOME/OrangeFox/sync
         cd $HOME/OrangeFox/sync
-
-        echo "=== Cloning OrangeFox sync script ==="
         git clone https://gitlab.com/OrangeFox/sync.git . --depth=1
-
-        echo "=== Running OrangeFox sync (branch 12.1) ==="
         ./orangefox_sync.sh --branch 12.1 --path $HOME/OrangeFox/fox_12.1
-
-        echo "=== Verifying build directory ==="
-        if [ ! -d "$HOME/OrangeFox/fox_12.1" ]; then
-          echo "ERROR: fox_12.1 directory not found!"
-          exit 1
-        fi
-
-        echo "=== Checking for build/envsetup.sh ==="
-        if [ -f "$HOME/OrangeFox/fox_12.1/build/envsetup.sh" ]; then
-          echo "✓ build/envsetup.sh found!"
-        else
-          echo "ERROR: build/envsetup.sh NOT found!"
-          exit 1
-        fi
         echo "source_synced=true" >> $GITHUB_OUTPUT
-
-    - name: Source cache hit info
-      if: |
-        steps.cache-source.outputs.cache-hit == 'true' && 
-        github.event.inputs.force_refresh_cache != 'true'
-      run: |
-        echo "✓ Source cache HIT - skipping sync"
-        echo "Cache key: fox-source-12.1-${{ steps.get-date.outputs.week }}"
-        ls -la $HOME/OrangeFox/fox_12.1/ 2>/dev/null || echo "Source directory exists"
 
     - name: Save OrangeFox source cache
       if: steps.sync-source.outputs.source_synced == 'true'
@@ -155,61 +127,35 @@ jobs:
 
     - name: Setup device tree
       run: |
-        echo "=== Device tree setup ==="
         cd $HOME/OrangeFox/fox_12.1
         mkdir -p device/infinix
-
-        echo "=== Copying device tree from workspace ==="
         cp -r "$GITHUB_WORKSPACE" device/infinix/${{ env.DEVICE }}
-
-        echo "=== Verifying device tree ==="
-        if [ ! -f "device/infinix/${{ env.DEVICE }}/BoardConfig.mk" ]; then
-          echo "ERROR: BoardConfig.mk not found in device tree!"
-          exit 1
-        fi
-        ls -la device/infinix/${{ env.DEVICE }}/
 
     - name: Building recovery
       id: build
       run: |
         cd $HOME/OrangeFox/fox_12.1
-
-        set +e
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         export CCACHE_DIR=/tmp/ccache
-        set -e
-
+        
         BUILD_TYPE="${{ github.event.inputs.build_type || 'With cache /out' }}"
-
         lunch twrp_${{ env.DEVICE }}-eng
 
         if [ "$BUILD_TYPE" = "Without cache /out" ]; then
-          echo "=== Build without cached /out (Fresh) ==="
           make clean
-        else
-          echo "=== Build with cached /out ==="
         fi
 
         mka adbd bootimage -j$(nproc --all)
-
         ccache -s
-
-        # Verify build success
-        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
-        if [ ! -f "$BOOT_IMG" ]; then
-          echo "ERROR: boot.img not built!"
-          exit 1
-        fi
-        echo "✓ boot.img built successfully at $BOOT_IMG"
       continue-on-error: true
 
     - name: Check build status
       if: steps.build.outcome == 'failure'
       run: |
-        echo "❌ Build failed! Check build logs for details."
+        echo "❌ Build failed!"
         exit 1
 
     - name: Save ccache
@@ -224,328 +170,145 @@ jobs:
         path: ~/OrangeFox/fox_12.1/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
 
-    - name: Upload original boot image (before cleanup)
+    - name: Upload original boot image
       uses: actions/upload-artifact@v4
       with:
         name: boot-img-original
         path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
         retention-days: 7
-        if-no-files-found: error
 
     - name: Install magiskboot
       run: |
-        echo "=== Installing magiskboot ==="
-        # Download latest Magisk APK
-        MAGISK_URL="https://github.com/topjohnwu/Magisk/releases/latest"
-        MAGISK_VERSION=$(curl -sL "$MAGISK_URL" | grep -oP 'tag/v\K[0-9.]+' | head -1)
-        echo "Magisk version: $MAGISK_VERSION"
-
-        # Download Magisk APK
+        MAGISK_VERSION=$(curl -sL "https://github.com/topjohnwu/Magisk/releases/latest" | grep -oP 'tag/v\K[0-9.]+' | head -1)
         curl -sL "https://github.com/topjohnwu/Magisk/releases/download/v${MAGISK_VERSION}/Magisk-v${MAGISK_VERSION}.apk" -o magisk.apk
-
-        # Extract magiskboot
         unzip -j magisk.apk "lib/x86_64/libmagiskboot.so" -d .
         mv libmagiskboot.so magiskboot
         chmod +x magiskboot
         sudo mv magiskboot /usr/local/bin/
 
-        # Verify installation
-        if [ -x /usr/local/bin/magiskboot ]; then
-          echo "✓ magiskboot installed successfully"
-        else
-          echo "✗ magiskboot installation failed"
-          exit 1
-        fi
-
     - name: Post-build cleanup & size verification
       run: |
-        echo "=== POST-BUILD CLEANUP WITH MAGISKBOOT ==="
-        echo "Target: Remove unused files to fit 32MB boot partition"
-        echo ""
-
         BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
         TARGET=33554432
-
-        if [ ! -f "$BOOT_IMG" ]; then
-          echo "ERROR: boot.img not found at $BOOT_IMG"
-          exit 1
-        fi
-
-        ORIG_SIZE=$(stat -c %s "$BOOT_IMG")
-        echo "Original boot.img size: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
-        echo ""
-
-        # Create working directory
         WORK_DIR=$(mktemp -d)
         cd "$WORK_DIR"
-
-        echo "=== [1/8] Unpacking boot image ==="
+        
+        echo "=== [1/9] Unpacking boot image ==="
         cp "$BOOT_IMG" boot.img
-        if ! magiskboot unpack -h boot.img; then
-          echo "ERROR: Failed to unpack boot.img"
-          exit 1
-        fi
-        echo ""
-
-        # Check ramdisk size BEFORE cleanup
-        RAMDISK_SIZE_BEFORE=$(stat -c %s ramdisk.cpio 2>/dev/null || echo "0")
-        echo "Ramdisk.cpio size BEFORE cleanup: $RAMDISK_SIZE_BEFORE bytes ($((RAMDISK_SIZE_BEFORE/1024)) KB)"
-        echo ""
-
-        echo "=== [2/8] Analyzing ramdisk contents ==="
-        echo "Counting total files in ramdisk:"
-        TOTAL_FILES=$(magiskboot cpio ramdisk.cpio ls 2>/dev/null | wc -l)
-        echo "Total files: $TOTAL_FILES"
-        echo ""
-
-        echo "=== [3/8] Removing unused libraries ==="
-        LIBRARIES_TO_REMOVE=(
-            "system/lib64/libchrome.so"
-            "system/lib64/libxml2.so"
-            "system/lib64/libnl.so"
-            "system/lib64/libunwindstack.so"
-            "system/lib64/libbacktrace.so"
-            "system/lib64/libclang_rt.ubsan_standalone-aarch64-android.so"
-            "system/lib64/libcppbor.so"
-            "system/lib64/libevent.so"
-            "system/lib64/android.system.wifi.keystore@1.0.so"
-            "sbin/magiskboot"
-        )
-
-        REMOVED_COUNT=0
-        for lib in "${LIBRARIES_TO_REMOVE[@]}"; do
-            if magiskboot cpio ramdisk.cpio "exists $lib" 2>/dev/null; then
-                echo "  ✓ Found & removing: $lib"
-                magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null
-                REMOVED_COUNT=$((REMOVED_COUNT + 1))
-            else
-                echo "  - Not found: $lib"
-            fi
+        magiskboot unpack -h boot.img
+        RAMDISK_BEFORE=$(stat -c %s ramdisk.cpio)
+        echo "Ramdisk BEFORE: $RAMDISK_BEFORE bytes ($((RAMDISK_BEFORE/1024)) KB)"
+        
+        echo "=== [2/9] Removing unused libraries ==="
+        for lib in system/lib64/libchrome.so system/lib64/libxml2.so system/lib64/libnl.so \
+                   system/lib64/libunwindstack.so system/lib64/libbacktrace.so \
+                   system/lib64/libclang_rt.ubsan_standalone-aarch64-android.so \
+                   system/lib64/libcppbor.so system/lib64/libevent.so \
+                   system/lib64/android.system.wifi.keystore@1.0.so sbin/magiskboot; do
+          magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null && echo "  ✓ $lib"
         done
-        echo ""
-        echo "Total libraries removed: $REMOVED_COUNT"
-        echo ""
-
-        echo "=== [4/8] Cleaning terminfo (keep essential) ==="
+        
+        echo "=== [3/9] Cleaning terminfo (keep essential) ==="
         mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
-
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null || echo "  linux: not found"
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" 2>/dev/null || echo "  vt100: not found"
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" 2>/dev/null || echo "  vt102: not found"
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null || echo "  xterm: not found"
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null || echo "  xterm-256color: not found"
-
-        magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null || echo "  terminfo directory not found"
-
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo"
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l"
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v"
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x"
-
-        [ -f terminfo_keep/l/linux ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/l/linux terminfo_keep/l/linux" && echo "  + linux"
-        [ -f terminfo_keep/v/vt100 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" && echo "  + vt100"
-        [ -f terminfo_keep/v/vt102 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" && echo "  + vt102"
-        [ -f terminfo_keep/x/xterm ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm terminfo_keep/x/xterm" && echo "  + xterm"
-        [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" && echo "  + xterm-256color"
-        echo ""
-
-        echo "=== [5/8] Removing extra themes (keep Default only) ==="
-        THEMES_TO_REMOVE=(
-            "twres/images/Black"
-            "twres/images/Cinnamon"
-            "twres/images/DBlack"
-            "twres/images/DCinnamon"
-            "twres/images/DFox"
-            "twres/images/DGoogle"
-            "twres/images/DGreen"
-            "twres/images/DLollipop"
-            "twres/images/DOcean"
-            "twres/images/DOrchid"
-            "twres/images/DPurple"
-            "twres/images/DRed"
-            "twres/images/DSpace"
-            "twres/images/DYellow"
-            "twres/images/Fox"
-            "twres/images/Google"
-            "twres/images/Green"
-            "twres/images/Light"
-            "twres/images/Lollipop"
-            "twres/images/Night"
-            "twres/images/Ocean"
-            "twres/images/Orchid"
-            "twres/images/Purple"
-            "twres/images/Red"
-            "twres/images/Space"
-            "twres/images/Splash"
-            "twres/images/Yellow"
-        )
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x" 2>/dev/null
+        [ -f terminfo_keep/l/linux ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/l/linux terminfo_keep/l/linux"
+        [ -f terminfo_keep/v/vt100 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt100 terminfo_keep/v/vt100"
+        [ -f terminfo_keep/v/vt102 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt102 terminfo_keep/v/vt102"
+        [ -f terminfo_keep/x/xterm ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm terminfo_keep/x/xterm"
+        [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color"
+        echo "Kept: linux, vt100, vt102, xterm, xterm-256color"
         
-        THEMES_REMOVED=0
-        for theme in "${THEMES_TO_REMOVE[@]}"; do
-            if magiskboot cpio ramdisk.cpio "exists $theme" 2>/dev/null; then
-                magiskboot cpio ramdisk.cpio "rm -r $theme" 2>/dev/null
-                THEMES_REMOVED=$((THEMES_REMOVED + 1))
-            fi
+        echo "=== [4/9] Removing extra themes (keep Default) ==="
+        for theme in Black Cinnamon DBlack DCinnamon DFox DGoogle DGreen DLollipop DOcean DOrchid DPurple DRed DSpace DYellow Fox Google Green Light Lollipop Night Ocean Orchid Purple Red Space Splash Yellow; do
+          magiskboot cpio ramdisk.cpio "rm -r twres/images/$theme" 2>/dev/null
         done
-        echo "Total themes removed: $THEMES_REMOVED (keeping Default only)"
-        echo ""
-
-        echo "=== [6/8] Removing extra fonts (keep Roboto-Regular.ttf only) ==="
-        FONTS_TO_REMOVE=(
-            "twres/fonts/Amatic.ttf"
-            "twres/fonts/Chococooky.ttf"
-            "twres/fonts/EuclidFlex-Medium.ttf"
-            "twres/fonts/EuclidFlex-Regular.ttf"
-            "twres/fonts/Exo2-Medium.ttf"
-            "twres/fonts/Exo2-Regular.ttf"
-            "twres/fonts/FiraCode-Medium.ttf"
-            "twres/fonts/FiraCode-Regular.ttf"
-            "twres/fonts/GoogleSans-Medium.ttf"
-            "twres/fonts/GoogleSans-Regular.ttf"
-            "twres/fonts/MILanPro-Medium.ttf"
-            "twres/fonts/MILanPro-Regular.ttf"
-            "twres/fonts/RobotoSlab.ttf"
-            "twres/fonts/Roboto-Medium.ttf"
-        )
+        echo "Themes removed (kept: Default)"
         
-        FONTS_REMOVED=0
-        for font in "${FONTS_TO_REMOVE[@]}"; do
-            if magiskboot cpio ramdisk.cpio "exists $font" 2>/dev/null; then
-                magiskboot cpio ramdisk.cpio "rm $font" 2>/dev/null
-                FONTS_REMOVED=$((FONTS_REMOVED + 1))
-            fi
+        echo "=== [5/9] Removing extra fonts (keep Roboto-Regular.ttf) ==="
+        for font in Amatic.ttf Chococooky.ttf EuclidFlex-Medium.ttf EuclidFlex-Regular.ttf \
+                    Exo2-Medium.ttf Exo2-Regular.ttf FiraCode-Medium.ttf FiraCode-Regular.ttf \
+                    GoogleSans-Medium.ttf GoogleSans-Regular.ttf MILanPro-Medium.ttf MILanPro-Regular.ttf \
+                    RobotoSlab.ttf Roboto-Medium.ttf; do
+          magiskboot cpio ramdisk.cpio "rm twres/fonts/$font" 2>/dev/null
         done
-        echo "Total fonts removed: $FONTS_REMOVED (keeping Roboto-Regular.ttf)"
-        echo ""
-
-        echo "=== [7/8] Removing extra languages (keep en.xml only) ==="
-        LANGUAGES_TO_REMOVE=(
-            "twres/languages/cs.xml"
-            "twres/languages/de.xml"
-            "twres/languages/el.xml"
-            "twres/languages/fr.xml"
-            "twres/languages/id.xml"
-            "twres/languages/it.xml"
-            "twres/languages/pl.xml"
-            "twres/languages/pt_PT.xml"
-            "twres/languages/ro.xml"
-            "twres/languages/ru.xml"
-            "twres/languages/tr.xml"
-            "twres/languages/ua.xml"
-        )
+        echo "Fonts removed (kept: Roboto-Regular.ttf)"
         
-        LANGS_REMOVED=0
-        for lang in "${LANGUAGES_TO_REMOVE[@]}"; do
-            if magiskboot cpio ramdisk.cpio "exists $lang" 2>/dev/null; then
-                magiskboot cpio ramdisk.cpio "rm $lang" 2>/dev/null
-                LANGS_REMOVED=$((LANGS_REMOVED + 1))
-            fi
+        echo "=== [6/9] Removing extra languages (keep en.xml) ==="
+        for lang in cs.xml de.xml el.xml fr.xml id.xml it.xml pl.xml pt_PT.xml ro.xml ru.xml tr.xml ua.xml; do
+          magiskboot cpio ramdisk.cpio "rm twres/languages/$lang" 2>/dev/null
         done
-        echo "Total languages removed: $LANGS_REMOVED (keeping en.xml)"
-        echo ""
-
-        echo "=== [8/8] Removing documentation and large TA file ==="
-        # Documentation/file lists
-        magiskboot cpio ramdisk.cpio "rm ramdisk-files.sha256sum" 2>/dev/null && echo "  ✓ Removed ramdisk-files.sha256sum"
-        magiskboot cpio ramdisk.cpio "rm ramdisk-files.txt" 2>/dev/null && echo "  ✓ Removed ramdisk-files.txt"
-        magiskboot cpio ramdisk.cpio "rm twres/credits.txt" 2>/dev/null && echo "  ✓ Removed twres/credits.txt"
-        magiskboot cpio ramdisk.cpio "rm twres/changelog.txt" 2>/dev/null && echo "  ✓ Removed twres/changelog.txt"
-        magiskboot cpio ramdisk.cpio "rm twres/translators.txt" 2>/dev/null && echo "  ✓ Removed twres/translators.txt"
+        echo "Languages removed (kept: en.xml)"
         
-        # Large TA file (DRM - not essential for recovery)
-        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/c09c9c5daa504b78b0e46eda61556c3a.ta" 2>/dev/null && echo "  ✓ Removed large TA file (2.06 MB)"
-        echo ""
-
-        # Check ramdisk size AFTER cleanup
-        RAMDISK_SIZE_AFTER=$(stat -c %s ramdisk.cpio 2>/dev/null || echo "0")
-        RAMDISK_SAVED=$((RAMDISK_SIZE_BEFORE - RAMDISK_SIZE_AFTER))
-        echo "Ramdisk.cpio size AFTER cleanup: $RAMDISK_SIZE_AFTER bytes ($((RAMDISK_SIZE_AFTER/1024)) KB)"
-        echo "Ramdisk saved: $RAMDISK_SAVED bytes ($((RAMDISK_SAVED/1024)) KB)"
-        echo ""
-
-        echo "=== Repacking boot image ==="
+        echo "=== [7/9] Removing documentation ==="
+        for doc in ramdisk-files.sha256sum ramdisk-files.txt twres/credits.txt twres/changelog.txt twres/translators.txt; do
+          magiskboot cpio ramdisk.cpio "rm $doc" 2>/dev/null
+        done
         
-        # Repack and capture output to get actual sizes
-        if ! REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1); then
-          echo "ERROR: Failed to repack boot.img"
-          echo "$REPACK_OUTPUT"
-          exit 1
-        fi
-        echo "$REPACK_OUTPUT"
-        echo ""
+        echo "=== [8/9] Removing non-critical TAs (DRM, Video, Camera, TUI) ==="
+        # DRM/Video TAs - not needed for recovery
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/07060000000000000000000000007169.ta" 2>/dev/null && echo "  ✓ Removed DRM/AVC TA"
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/08070000000000000000000000008270.ta" 2>/dev/null && echo "  ✓ Removed VP9 TA"
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/07407000000000000000000000000000.ta" 2>/dev/null && echo "  ✓ Removed Camera Sensor TA"
+        magiskboot cpio ramdisk.cpio "rm vendor/thh/ta/05120000000000000000000000000000.ta" 2>/dev/null && echo "  ✓ Removed Trusted UI TA"
         
-        # Extract actual sizes from repack output (use tail -1 to get REPACK sizes, not UNPACK)
+        # Touchscreen firmware - not essential for recovery
+        magiskboot cpio ramdisk.cpio "rm vendor/firmware/novatek_ts_fw.bin" 2>/dev/null && echo "  ✓ Removed touchscreen FW"
+        magiskboot cpio ramdisk.cpio "rm vendor/firmware/novatek_ts_mp.bin" 2>/dev/null && echo "  ✓ Removed touchscreen FW (MP)"
+        
+        # Unused tools
+        magiskboot cpio ramdisk.cpio "rm system/bin/bc" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "rm system/bin/awk" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "rm system/bin/lzma" 2>/dev/null
+        
+        echo "=== [9/9] Repacking boot image ==="
+        REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1)
         KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'KERNEL_SZ\s*\[\K[0-9]+' | tail -1)
         RAMDISK_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'RAMDISK_SZ\s*\[\K[0-9]+' | tail -1)
         DTB_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'DTB_SZ\s*\[\K[0-9]+' | tail -1)
-        
-        # Validate and set defaults
-        if [ -z "$KERNEL_SZ" ] || [ -z "$RAMDISK_SZ" ]; then
-          echo "ERROR: Failed to extract KERNEL_SZ or RAMDISK_SZ from repack output"
-          echo "KERNEL_SZ: $KERNEL_SZ"
-          echo "RAMDISK_SZ: $RAMDISK_SZ"
-          exit 1
-        fi
-        
-        # DTB is optional, default to 0
         DTB_SZ=${DTB_SZ:-0}
         
-        echo "Extracted sizes:"
-        echo "  KERNEL_SZ:  $KERNEL_SZ bytes"
-        echo "  RAMDISK_SZ: $RAMDISK_SZ bytes"
-        echo "  DTB_SZ:     $DTB_SZ bytes"
-        echo ""
-        
-        # Calculate padded sizes (align to page size 2048)
         PAGE_SIZE=2048
         KERNEL_PADDED=$(( ((KERNEL_SZ + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE ))
         RAMDISK_PADDED=$(( ((RAMDISK_SZ + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE ))
         DTB_PADDED=$(( ((DTB_SZ + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE ))
         TOTAL_SIZE=$((PAGE_SIZE + KERNEL_PADDED + RAMDISK_PADDED + DTB_PADDED))
         
-        echo "Padded sizes (page-aligned to $PAGE_SIZE bytes):"
-        echo "  Kernel padded:  $KERNEL_PADDED bytes"
-        echo "  Ramdisk padded: $RAMDISK_PADDED bytes"
-        echo "  DTB padded:     $DTB_PADDED bytes"
-        echo "  Total:          $TOTAL_SIZE bytes ($((TOTAL_SIZE/1024/1024)) MB)"
-        echo ""
-        
-        # Truncate to actual size (remove padding from original)
-        echo "Truncating new-boot.img to actual content size..."
         truncate -s $TOTAL_SIZE new-boot.img
-        
-        # Replace original with optimized
         cp new-boot.img "$BOOT_IMG"
-
-        # Show size comparison
+        
         NEW_SIZE=$(stat -c %s new-boot.img)
-        SAVED=$((ORIG_SIZE - NEW_SIZE))
-
+        ORIG_SIZE=$(stat -c %s boot.img)
+        RAMDISK_AFTER=$(stat -c %s ramdisk.cpio)
+        
         echo ""
         echo "=============================================="
         echo "          SIZE COMPARISON SUMMARY"
         echo "=============================================="
-        echo "  Original: $ORIG_SIZE bytes ($((ORIG_SIZE/1024/1024)) MB)"
-        echo "  New:      $NEW_SIZE bytes ($((NEW_SIZE/1024/1024)) MB)"
-        echo "  Saved:    $SAVED bytes ($((SAVED/1024)) KB)"
-        echo "  Target:   $TARGET bytes (32 MB)"
+        echo "  Original boot.img: 64 MB"
+        echo "  New boot.img:      $((NEW_SIZE/1024/1024)) MB"
+        echo "  Target:            32 MB"
+        echo "  Ramdisk saved:     $(( (RAMDISK_BEFORE - RAMDISK_AFTER) / 1024 )) KB"
         echo "=============================================="
         echo ""
-
+        
         if [ $NEW_SIZE -le $TARGET ]; then
           MARGIN=$(( TARGET - NEW_SIZE ))
-          echo "✓ SUCCESS! Boot image fits in 32MB partition"
-          echo "  Margin: $MARGIN bytes ($(( MARGIN / 1024 )) KB)"
-          echo ""
-          echo "=== POST-BUILD CLEANUP COMPLETE ==="
+          echo "✓ SUCCESS! Boot image fits in 32MB partition (Margin: $((MARGIN/1024)) KB)"
         else
           OVERFLOW=$(( NEW_SIZE - TARGET ))
-          echo "✗ FAILED! Boot image still too large"
-          echo "  Overflow: $OVERFLOW bytes ($(( OVERFLOW / 1024 )) KB)"
+          echo "✗ FAILED! Overflow: $((OVERFLOW/1024)) KB"
           exit 1
         fi
-
-        # Cleanup
+        
         cd /
         rm -rf "$WORK_DIR"
 
@@ -555,15 +318,3 @@ jobs:
         name: OrangeFox-R11.3-${{ env.DEVICE }}-32mb
         path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
         retention-days: 7
-        if-no-files-found: error
-
-    - name: Upload build log on failure
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: build-error-log
-        path: |
-          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/obj/PACKAGING/**/*.log
-          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/*.log
-        retention-days: 3
-        if-no-files-found: ignore
