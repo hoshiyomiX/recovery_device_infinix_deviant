@@ -24,6 +24,7 @@ on:
 env:
   DEVICE: deviant
   CCACHE_DIR: /tmp/ccache
+  FOX_HOME: $HOME/OrangeFox/fox_12.1
 
 jobs:
   build:
@@ -71,7 +72,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-source
       with:
-        path: ~/OrangeFox/fox_12.1
+        path: ${{ env.FOX_HOME }}
         key: fox-source-12.1-${{ steps.get-date.outputs.week }}
         restore-keys: |
           fox-source-12.1-
@@ -98,20 +99,21 @@ jobs:
       uses: actions/cache@v4
       id: cache-out
       with:
-        path: ~/OrangeFox/fox_12.1/out
+        path: ${{ env.FOX_HOME }}/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
         restore-keys: |
           out-${{ env.DEVICE }}-
           out-
 
     - name: Sync OrangeFox source
+      id: sync-source
       if: |
         steps.cache-source.outputs.cache-hit != 'true' || 
         github.event.inputs.force_refresh_cache == 'true'
       run: |
         echo "=== Source cache miss or force refresh - syncing... ==="
         echo "=== Creating OrangeFox directories ==="
-        mkdir -p $HOME/OrangeFox/fox_12.1
+        mkdir -p $FOX_HOME
         cd $HOME/OrangeFox
 
         echo "=== Cloning OrangeFox sync script ==="
@@ -119,21 +121,22 @@ jobs:
         cd sync
 
         echo "=== Running OrangeFox sync (branch 12.1) ==="
-        ./orangefox_sync.sh --branch 12.1 --path $HOME/OrangeFox/fox_12.1
+        ./orangefox_sync.sh --branch 12.1 --path $FOX_HOME
 
         echo "=== Verifying build directory ==="
-        if [ ! -d "$HOME/OrangeFox/fox_12.1" ]; then
+        if [ ! -d "$FOX_HOME" ]; then
           echo "ERROR: fox_12.1 directory not found!"
           exit 1
         fi
 
         echo "=== Checking for build/envsetup.sh ==="
-        if [ -f "$HOME/OrangeFox/fox_12.1/build/envsetup.sh" ]; then
+        if [ -f "$FOX_HOME/build/envsetup.sh" ]; then
           echo "✓ build/envsetup.sh found!"
         else
           echo "ERROR: build/envsetup.sh NOT found!"
           exit 1
         fi
+        echo "source_synced=true" >> $GITHUB_OUTPUT
 
     - name: Source cache hit info
       if: |
@@ -142,12 +145,19 @@ jobs:
       run: |
         echo "✓ Source cache HIT - skipping sync"
         echo "Cache key: fox-source-12.1-${{ steps.get-date.outputs.week }}"
-        ls -la $HOME/OrangeFox/fox_12.1/ 2>/dev/null || echo "Source directory exists"
+        ls -la $FOX_HOME/ 2>/dev/null || echo "Source directory exists"
+
+    - name: Save OrangeFox source cache
+      if: steps.sync-source.outputs.source_synced == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ env.FOX_HOME }}
+        key: fox-source-12.1-${{ steps.get-date.outputs.week }}
 
     - name: Setup device tree
       run: |
         echo "=== Device tree setup ==="
-        cd $HOME/OrangeFox/fox_12.1
+        cd $FOX_HOME
         mkdir -p device/infinix
 
         echo "=== Copying device tree from workspace ==="
@@ -163,7 +173,7 @@ jobs:
     - name: Building recovery
       id: build
       run: |
-        cd $HOME/OrangeFox/fox_12.1
+        cd $FOX_HOME
 
         set +e
         source build/envsetup.sh
@@ -189,31 +199,30 @@ jobs:
         ccache -s
 
         # Verify build success
-        BOOT_IMG="out/target/product/${{ env.DEVICE }}/boot.img"
+        BOOT_IMG="$FOX_HOME/out/target/product/${{ env.DEVICE }}/boot.img"
         if [ ! -f "$BOOT_IMG" ]; then
           echo "ERROR: boot.img not built!"
           exit 1
         fi
-        echo "✓ boot.img built successfully"
-        echo "boot_img_path=$HOME/OrangeFox/fox_12.1/$BOOT_IMG" >> $GITHUB_OUTPUT
+        echo "✓ boot.img built successfully at $BOOT_IMG"
       continue-on-error: true
 
+    - name: Check build status
+      if: steps.build.outcome == 'failure'
+      run: |
+        echo "❌ Build failed! Check build logs for details."
+        exit 1
+
     - name: Save ccache
-      if: |
-        github.event.inputs.force_refresh_cache != 'true' &&
-        steps.cache-ccache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: /tmp/ccache
         key: ccache-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
 
     - name: Save build output
-      if: |
-        github.event.inputs.force_refresh_cache != 'true' &&
-        steps.cache-out.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path: ~/OrangeFox/fox_12.1/out
+        path: ${{ env.FOX_HOME }}/out
         key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
 
     - name: Install magiskboot
@@ -247,7 +256,7 @@ jobs:
         echo "Target: Remove unused files to fit 32MB boot partition"
         echo ""
 
-        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
+        BOOT_IMG="$FOX_HOME/out/target/product/${{ env.DEVICE }}/boot.img"
         TARGET=33554432
 
         if [ ! -f "$BOOT_IMG" ]; then
@@ -265,7 +274,10 @@ jobs:
 
         echo "=== [1/5] Unpacking boot image ==="
         cp "$BOOT_IMG" boot.img
-        magiskboot unpack -h boot.img
+        if ! magiskboot unpack -h boot.img; then
+          echo "ERROR: Failed to unpack boot.img"
+          exit 1
+        fi
         echo ""
 
         # Check ramdisk size BEFORE cleanup
@@ -369,14 +381,29 @@ jobs:
         echo ""
         
         # Repack and capture output to get actual sizes
-        REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1)
+        if ! REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1); then
+          echo "ERROR: Failed to repack boot.img"
+          echo "$REPACK_OUTPUT"
+          exit 1
+        fi
         echo "$REPACK_OUTPUT"
         echo ""
         
-        # Extract actual sizes from repack output
-        KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep "KERNEL_SZ" | head -2 | tail -1 | grep -oP '\[\K[0-9]+')
-        RAMDISK_SZ=$(echo "$REPACK_OUTPUT" | grep "RAMDISK_SZ" | head -2 | tail -1 | grep -oP '\[\K[0-9]+')
-        DTB_SZ=$(echo "$REPACK_OUTPUT" | grep "DTB_SZ" | head -2 | tail -1 | grep -oP '\[\K[0-9]+')
+        # Extract actual sizes from repack output (with validation)
+        KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'KERNEL_SZ\s*\[\K[0-9]+' | head -1)
+        RAMDISK_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'RAMDISK_SZ\s*\[\K[0-9]+' | head -1)
+        DTB_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'DTB_SZ\s*\[\K[0-9]+' | head -1)
+        
+        # Validate and set defaults
+        if [ -z "$KERNEL_SZ" ] || [ -z "$RAMDISK_SZ" ]; then
+          echo "ERROR: Failed to extract KERNEL_SZ or RAMDISK_SZ from repack output"
+          echo "KERNEL_SZ: $KERNEL_SZ"
+          echo "RAMDISK_SZ: $RAMDISK_SZ"
+          exit 1
+        fi
+        
+        # DTB is optional, default to 0
+        DTB_SZ=${DTB_SZ:-0}
         
         echo "Extracted sizes:"
         echo "  KERNEL_SZ:  $KERNEL_SZ bytes"
@@ -441,7 +468,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: OrangeFox-R11.3-${{ env.DEVICE }}-32mb
-        path: ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img
+        path: ${{ env.FOX_HOME }}/out/target/product/${{ env.DEVICE }}/boot.img
         retention-days: 7
         if-no-files-found: error
 
@@ -451,7 +478,7 @@ jobs:
       with:
         name: build-error-log
         path: |
-          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/obj/PACKAGING/**/*.log
-          ~/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/*.log
+          ${{ env.FOX_HOME }}/out/target/product/${{ env.DEVICE }}/obj/PACKAGING/**/*.log
+          ${{ env.FOX_HOME }}/out/target/product/${{ env.DEVICE }}/*.log
         retention-days: 3
         if-no-files-found: ignore
