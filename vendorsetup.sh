@@ -37,8 +37,12 @@ export TW_INCLUDE_BUSYBOX=true
 export FOX_USE_BUSYBOX=1
 export FOX_USE_BUSYBOX_APPLETS="sh,ash,tar,gzip,gunzip,bzip2,bunzip2,xz,unxz,zip,unzip,vi,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd"
 
+# Exclude bash/nano/gnutar - Use BusyBox instead
+export TW_EXCLUDE_BASH=true
+export TW_EXCLUDE_NANO=true
+export TW_EXCLUDE_GNU_TAR=true
+
 # Feature Support (BusyBox replacements)
-# Note: bash/nano excluded via BoardConfig.mk TW_EXCLUDE_* flags
 export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 
