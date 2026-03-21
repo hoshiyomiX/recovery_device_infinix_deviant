@@ -135,21 +135,37 @@ jobs:
       id: build
       run: |
         cd $HOME/OrangeFox/fox_12.1
+
+        set +e
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         export USE_CCACHE=1
         export CCACHE_EXEC=/usr/bin/ccache
         export CCACHE_DIR=/tmp/ccache
-        
+        set -e
+
         BUILD_TYPE="${{ github.event.inputs.build_type || 'With cache /out' }}"
+
         lunch twrp_${{ env.DEVICE }}-eng
 
         if [ "$BUILD_TYPE" = "Without cache /out" ]; then
+          echo "=== Build without cached /out (Fresh) ==="
           make clean
+        else
+          echo "=== Build with cached /out ==="
         fi
 
         mka adbd bootimage -j$(nproc --all)
+
         ccache -s
+
+        # Verify build success
+        BOOT_IMG="$HOME/OrangeFox/fox_12.1/out/target/product/${{ env.DEVICE }}/boot.img"
+        if [ ! -f "$BOOT_IMG" ]; then
+          echo "ERROR: boot.img not built!"
+          exit 1
+        fi
+        echo "✓ boot.img built successfully at $BOOT_IMG"
       continue-on-error: true
 
     - name: Check build status
