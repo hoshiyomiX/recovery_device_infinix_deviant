@@ -185,7 +185,10 @@ TW_INCLUDE_NTFS_3G := true
 TW_INCLUDE_REPACKTOOLS := true
 TW_INCLUDE_RESETPROP := true
 
-# Exclude
+# BusyBox - Replace bash/gnutar with busybox (lighter & more complete)
+TW_INCLUDE_BUSYBOX := true
+
+# Exclude - Reduce size
 TW_EXCLUDE_APEX := true
 TW_EXCLUDE_DEFAULT_USB_INIT := true
 TW_EXCLUDE_TWRPAPP := true
@@ -194,6 +197,7 @@ TW_EXCLUDE_NANO := true
 TW_EXCLUDE_LPDUMP := true
 TW_EXCLUDE_PYTHON := true
 TW_EXCLUDE_SUPER_VOLUME := true
+TW_EXCLUDE_GNU_TAR := true
 
 # Init
 TARGET_INIT_VENDOR_LIB := libinit_Infinix-deviant

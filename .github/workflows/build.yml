@@ -253,18 +253,23 @@ jobs:
           magiskboot cpio ramdisk.cpio "rm $doc" 2>/dev/null
         done
         
-        echo "=== [8/9] Removing non-critical tools ==="
-        # === KEEP ALL TA FILES INTACT - Required for TEE functionality ===
-        # === KEEP gnutar - GNU tar has more features than toybox tar ===
+        echo "=== [8/9] Post-build cleanup ==="
+        # Note: BoardConfig.mk now includes TW_INCLUDE_BUSYBOX=true and excludes:
+        #   - TW_EXCLUDE_BASH := true
+        #   - TW_EXCLUDE_NANO := true  
+        #   - TW_EXCLUDE_GNU_TAR := true
+        # These cleanup steps are fallback in case build flags don't apply
 
-        # Remove nano editor - toybox has vi
+        # === KEEP ALL TA FILES INTACT - Required for TEE functionality ===
+
+        # Fallback cleanup for bash/nano/gnutar (should be excluded by build)
+        magiskboot cpio ramdisk.cpio "rm sbin/bash" 2>/dev/null && echo "  ✓ Removed bash (busybox ash)"
         magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null && echo "  ✓ Removed nano editor"
         magiskboot cpio ramdisk.cpio "rm sbin/nano" 2>/dev/null
+        magiskboot cpio ramdisk.cpio "rm sbin/gnutar" 2>/dev/null && echo "  ✓ Removed gnutar (busybox tar)"
+        magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null && echo "  ✓ Removed ps (busybox ps)"
 
-        # Remove ps binary - toybox provides ps
-        magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null && echo "  ✓ Removed ps binary (toybox has ps)"
-
-        # Unused tools (toybox provides alternatives)
+        # Remove unused tools
         magiskboot cpio ramdisk.cpio "rm system/bin/bc" 2>/dev/null
         magiskboot cpio ramdisk.cpio "rm system/bin/awk" 2>/dev/null
         
