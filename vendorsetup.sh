@@ -27,11 +27,18 @@ export OF_PATCH_BOOTIMAGE=false
 export FOX_DELETE_AROMAFM=1
 export FOX_REMOVE_AAPT=1
 
-# Feature Support
-export FOX_ENABLE_APP_MANAGER=1
-export FOX_USE_BASH_SHELL=1
-export FOX_ASH_IS_BASH=true
-export FOX_USE_NANO_EDITOR=1
+# ============================================
+# BusyBox Configuration (Replace bash/nano/gnutar)
+# BusyBox provides: ash shell, tar, vi, gzip, bzip2, xz, zip/unzip
+# Size: ~800 KB vs bash(1.4MB) + gnutar(982KB) = 2.4 MB
+# Savings: ~1.6 MB
+# ============================================
+export TW_INCLUDE_BUSYBOX=true
+export FOX_USE_BUSYBOX=1
+export FOX_USE_BUSYBOX_APPLETS="sh,ash,tar,gzip,gunzip,bzip2,bunzip2,xz,unxz,zip,unzip,vi,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd"
+
+# Feature Support (BusyBox replacements)
+# Note: bash/nano excluded via BoardConfig.mk TW_EXCLUDE_* flags
 export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 
