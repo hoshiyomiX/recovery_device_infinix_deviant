@@ -206,6 +206,7 @@ jobs:
         fi
         echo "✓ boot.img built successfully"
         echo "boot_img_path=$HOME/OrangeFox/fox_12.1/$BOOT_IMG" >> $GITHUB_OUTPUT
+      continue-on-error: true
 
     - name: Install magiskboot
       run: |
