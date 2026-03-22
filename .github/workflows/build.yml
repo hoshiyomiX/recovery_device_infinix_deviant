@@ -271,7 +271,11 @@ jobs:
         
         echo "=== [8/9] Removing non-critical tools ==="
         # === KEEP ALL TA FILES INTACT - Required for TEE functionality ===
-        # === KEEP nano - User requested to keep nano editor ===
+        # === nano excluded via TW_EXCLUDE_NANO, BusyBox vi is used instead ===
+
+        # Remove nano editor - BusyBox has vi
+        magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null && echo "  ✓ Removed nano editor (BusyBox has vi)"
+        magiskboot cpio ramdisk.cpio "rm sbin/nano" 2>/dev/null
 
         # Remove ps binary - BusyBox provides ps
         magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null && echo "  ✓ Removed ps binary (BusyBox has ps)"

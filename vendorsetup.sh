@@ -39,16 +39,16 @@ export TW_INCLUDE_BUSYBOX=true
 export TW_USE_BUSYBOX=true
 export TW_USE_TOOLBOX=false
 export FOX_USE_BUSYBOX=1
-export FOX_USE_BUSYBOX_APPLETS="sh,ash,bash,tar,gzip,xz,unxz,zip,unzip,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd,ln,echo,printf,test"
+export FOX_USE_BUSYBOX_APPLETS="sh,ash,bash,tar,gzip,xz,unxz,zip,unzip,vi,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd,ln,echo,printf,test"
 
-# Exclude bash/gnutar - Use BusyBox instead (keep nano)
+# Exclude bash/gnutar/nano - Use BusyBox instead
 export TW_EXCLUDE_BASH=true
 export TW_EXCLUDE_GNU_TAR=true
+export TW_EXCLUDE_NANO=true
 
 # Feature Support
 export FOX_ENABLE_APP_MANAGER=1
 export FOX_ASH_IS_BASH=true
-export FOX_USE_NANO_EDITOR=1
 export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 
