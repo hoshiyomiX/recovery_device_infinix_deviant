@@ -53,8 +53,8 @@ export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 
 # Build Metadata
-export FOX_BUILD_TYPE="userdebug"
-export FOX_VARIANT="XOS-V590"
+export FOX_BUILD_TYPE="Release"
+export FOX_VARIANT="deviant"
 export OF_MAINTAINER="excaliburXD"
 export FOX_MAINTAINER_PATCH_VERSION=1
 
