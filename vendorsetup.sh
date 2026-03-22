@@ -30,22 +30,25 @@ export FOX_REMOVE_AAPT=1
 # ============================================
 # BusyBox Configuration
 # BusyBox ash provides bash-like shell (via FOX_ASH_IS_BASH)
-# Applets: sh, ash, bash (symlink to ash), tar, vi, gzip, xz, zip
-# Size: ~800 KB vs bash(1.4MB) + gnutar(982KB) + nano(830KB) = 3.2 MB
-# Savings: ~2.4 MB
+# Applets: sh, ash, bash (symlink), tar, vi, gzip, xz, zip
+# nano is kept (not excluded) - full editor support
+# Size: ~800 KB vs bash(1.4MB) + gnutar(982KB) = 2.4 MB
+# Savings: ~1.6 MB
 # ============================================
 export TW_INCLUDE_BUSYBOX=true
+export TW_USE_BUSYBOX=true
+export TW_USE_TOOLBOX=false
 export FOX_USE_BUSYBOX=1
 export FOX_USE_BUSYBOX_APPLETS="sh,ash,bash,tar,gzip,gunzip,bzip2,bunzip2,xz,unxz,zip,unzip,vi,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd,ln,echo,printf,test"
 
-# Exclude bash/nano/gnutar - Use BusyBox instead
+# Exclude bash/gnutar - Use BusyBox instead (keep nano)
 export TW_EXCLUDE_BASH=true
-export TW_EXCLUDE_NANO=true
 export TW_EXCLUDE_GNU_TAR=true
 
 # Feature Support
 export FOX_ENABLE_APP_MANAGER=1
 export FOX_ASH_IS_BASH=true
+export FOX_USE_NANO_EDITOR=1
 export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 

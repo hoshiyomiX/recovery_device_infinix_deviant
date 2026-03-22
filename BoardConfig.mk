@@ -154,7 +154,7 @@ TW_BRIGHTNESS_PATH := "/sys/class/leds/lcd-backlight/brightness"
 TW_DEFAULT_BRIGHTNESS := 1200
 TW_MAX_BRIGHTNESS := 2460
 TW_FRAMERATE := 60
-TW_USE_TOOLBOX := true
+TW_USE_TOOLBOX := false
 TW_SKIP_COMPATIBILITY_CHECK := true
 TW_NO_SCREEN_BLANK := true
 TW_NO_LEGACY_PROPS := true
@@ -185,15 +185,15 @@ TW_INCLUDE_NTFS_3G := true
 TW_INCLUDE_REPACKTOOLS := true
 TW_INCLUDE_RESETPROP := true
 
-# BusyBox - Replace bash/gnutar with busybox (lighter & more complete)
+# BusyBox - Primary shell & utilities (disable toybox)
 TW_INCLUDE_BUSYBOX := true
+TW_USE_BUSYBOX := true
 
 # Exclude - Reduce size
 TW_EXCLUDE_APEX := true
 TW_EXCLUDE_DEFAULT_USB_INIT := true
 TW_EXCLUDE_TWRPAPP := true
 TW_EXCLUDE_BASH := true
-TW_EXCLUDE_NANO := true
 TW_EXCLUDE_LPDUMP := true
 TW_EXCLUDE_PYTHON := true
 TW_EXCLUDE_SUPER_VOLUME := true
