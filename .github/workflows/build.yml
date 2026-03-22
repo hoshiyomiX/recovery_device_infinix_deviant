@@ -186,75 +186,140 @@ jobs:
         RAMDISK_BEFORE=$(stat -c %s ramdisk.cpio)
         echo "Ramdisk BEFORE: $RAMDISK_BEFORE bytes ($((RAMDISK_BEFORE/1024)) KB)"
         
+        echo ""
         echo "=== [2/9] Removing unused libraries ==="
+        DELETED=0; NOT_FOUND=0
         for lib in system/lib64/libchrome.so system/lib64/libxml2.so system/lib64/libnl.so \
                    system/lib64/libunwindstack.so system/lib64/libbacktrace.so \
                    system/lib64/libclang_rt.ubsan_standalone-aarch64-android.so \
                    system/lib64/libcppbor.so system/lib64/libevent.so \
                    system/lib64/android.system.wifi.keystore@1.0.so sbin/magiskboot; do
-          magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null && echo "  ✓ $lib"
+          if magiskboot cpio ramdisk.cpio "rm $lib" 2>/dev/null; then
+            echo "  ✓ Deleted: $lib"
+            DELETED=$((DELETED + 1))
+          else
+            echo "  - Not found: $lib"
+            NOT_FOUND=$((NOT_FOUND + 1))
+          fi
         done
+        echo "  Summary: $DELETED deleted, $NOT_FOUND not found"
         
+        echo ""
         echo "=== [3/9] Cleaning terminfo (keep essential) ==="
         mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/l/linux terminfo_keep/l/linux" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm terminfo_keep/x/xterm" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null || true
+        TERMINFO_KEPT=""
+        for term in linux vt100 vt102 xterm xterm-256color; do
+          case $term in
+            linux) dir="l" ;;
+            vt100|vt102) dir="v" ;;
+            xterm|xterm-256color) dir="x" ;;
+          esac
+          if magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/$dir/$term terminfo_keep/$dir/$term" 2>/dev/null; then
+            TERMINFO_KEPT="$TERMINFO_KEPT $term"
+            echo "  ✓ Extracted: $term"
+          else
+            echo "  - Not found: $term"
+          fi
+        done
+        if magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null; then
+          echo "  ✓ Removed terminfo directory"
+        fi
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo" 2>/dev/null || true
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l" 2>/dev/null || true
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v" 2>/dev/null || true
         magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x" 2>/dev/null || true
-        [ -f terminfo_keep/l/linux ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/l/linux terminfo_keep/l/linux" || true
-        [ -f terminfo_keep/v/vt100 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt100 terminfo_keep/v/vt100" || true
-        [ -f terminfo_keep/v/vt102 ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/v/vt102 terminfo_keep/v/vt102" || true
-        [ -f terminfo_keep/x/xterm ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm terminfo_keep/x/xterm" || true
-        [ -f terminfo_keep/x/xterm-256color ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/x/xterm-256color terminfo_keep/x/xterm-256color" || true
-        echo "Kept: linux, vt100, vt102, xterm, xterm-256color"
-        
-        echo "=== [4/9] Removing extra themes (keep Default) ==="
-        for theme in Black Cinnamon DBlack DCinnamon DFox DGoogle DGreen DLollipop DOcean DOrchid DPurple DRed DSpace DYellow Fox Google Green Light Lollipop Night Ocean Orchid Purple Red Space Splash Yellow; do
-          magiskboot cpio ramdisk.cpio "rm -r twres/images/$theme" 2>/dev/null || true
+        for term in linux vt100 vt102 xterm xterm-256color; do
+          case $term in
+            linux) dir="l" ;;
+            vt100|vt102) dir="v" ;;
+            xterm|xterm-256color) dir="x" ;;
+          esac
+          [ -f "terminfo_keep/$dir/$term" ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/$dir/$term terminfo_keep/$dir/$term" 2>/dev/null
         done
-        echo "Themes removed (kept: Default)"
+        echo "  Kept:$TERMINFO_KEPT"
         
+        echo ""
+        echo "=== [4/9] Removing extra themes (keep Default) ==="
+        DELETED=0; NOT_FOUND=0
+        for theme in Black Cinnamon DBlack DCinnamon DFox DGoogle DGreen DLollipop DOcean DOrchid DPurple DRed DSpace DYellow Fox Google Green Light Lollipop Night Ocean Orchid Purple Red Space Splash Yellow; do
+          if magiskboot cpio ramdisk.cpio "rm -r twres/images/$theme" 2>/dev/null; then
+            DELETED=$((DELETED + 1))
+          else
+            NOT_FOUND=$((NOT_FOUND + 1))
+          fi
+        done
+        echo "  Summary: $DELETED themes deleted, $NOT_FOUND not found (kept: Default)"
+        
+        echo ""
         echo "=== [5/9] Removing extra fonts (keep Roboto-Regular.ttf) ==="
+        DELETED=0; NOT_FOUND=0
         for font in Amatic.ttf Chococooky.ttf EuclidFlex-Medium.ttf EuclidFlex-Regular.ttf \
                     Exo2-Medium.ttf Exo2-Regular.ttf FiraCode-Medium.ttf FiraCode-Regular.ttf \
                     GoogleSans-Medium.ttf GoogleSans-Regular.ttf MILanPro-Medium.ttf MILanPro-Regular.ttf \
                     RobotoSlab.ttf Roboto-Medium.ttf; do
-          magiskboot cpio ramdisk.cpio "rm twres/fonts/$font" 2>/dev/null || true
+          if magiskboot cpio ramdisk.cpio "rm twres/fonts/$font" 2>/dev/null; then
+            DELETED=$((DELETED + 1))
+          else
+            NOT_FOUND=$((NOT_FOUND + 1))
+          fi
         done
-        echo "Fonts removed (kept: Roboto-Regular.ttf)"
+        echo "  Summary: $DELETED fonts deleted, $NOT_FOUND not found (kept: Roboto-Regular.ttf)"
         
+        echo ""
         echo "=== [6/9] Removing extra languages (keep en.xml) ==="
+        DELETED=0; NOT_FOUND=0
         for lang in cs.xml de.xml el.xml fr.xml id.xml it.xml pl.xml pt_PT.xml ro.xml ru.xml tr.xml ua.xml; do
-          magiskboot cpio ramdisk.cpio "rm twres/languages/$lang" 2>/dev/null || true
+          if magiskboot cpio ramdisk.cpio "rm twres/languages/$lang" 2>/dev/null; then
+            DELETED=$((DELETED + 1))
+          else
+            NOT_FOUND=$((NOT_FOUND + 1))
+          fi
         done
-        echo "Languages removed (kept: en.xml)"
+        echo "  Summary: $DELETED languages deleted, $NOT_FOUND not found (kept: en.xml)"
         
+        echo ""
         echo "=== [7/9] Removing documentation ==="
+        DELETED=0; NOT_FOUND=0
         for doc in ramdisk-files.sha256sum ramdisk-files.txt twres/credits.txt twres/changelog.txt twres/translators.txt; do
-          magiskboot cpio ramdisk.cpio "rm $doc" 2>/dev/null || true
+          if magiskboot cpio ramdisk.cpio "rm $doc" 2>/dev/null; then
+            echo "  ✓ Deleted: $doc"
+            DELETED=$((DELETED + 1))
+          else
+            echo "  - Not found: $doc"
+            NOT_FOUND=$((NOT_FOUND + 1))
+          fi
         done
+        echo "  Summary: $DELETED deleted, $NOT_FOUND not found"
         
+        echo ""
         echo "=== [8/9] Removing non-critical tools ==="
         # === KEEP ALL TA FILES INTACT - Required for TEE functionality ===
         # === nano excluded via TW_EXCLUDE_NANO, BusyBox vi is used instead ===
 
-        # Remove nano editor - BusyBox has vi
-        magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "rm sbin/nano" 2>/dev/null || true
-
-        # Remove ps binary - BusyBox provides ps
-        magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null || true
-
-        # Unused tools (BusyBox provides alternatives)
-        magiskboot cpio ramdisk.cpio "rm system/bin/bc" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "rm system/bin/awk" 2>/dev/null || true
+        if magiskboot cpio ramdisk.cpio "rm -r FFiles/nano" 2>/dev/null; then
+          echo "  ✓ Deleted: FFiles/nano (BusyBox has vi)"
+        else
+          echo "  - Not found: FFiles/nano"
+        fi
+        if magiskboot cpio ramdisk.cpio "rm sbin/nano" 2>/dev/null; then
+          echo "  ✓ Deleted: sbin/nano"
+        else
+          echo "  - Not found: sbin/nano"
+        fi
+        if magiskboot cpio ramdisk.cpio "rm FFiles/ps" 2>/dev/null; then
+          echo "  ✓ Deleted: FFiles/ps (BusyBox has ps)"
+        else
+          echo "  - Not found: FFiles/ps"
+        fi
+        for tool in system/bin/bc system/bin/awk; do
+          if magiskboot cpio ramdisk.cpio "rm $tool" 2>/dev/null; then
+            echo "  ✓ Deleted: $tool"
+          else
+            echo "  - Not found: $tool"
+          fi
+        done
         
+        echo ""
         echo "=== [9/9] Repacking boot image ==="
         REPACK_OUTPUT=$(magiskboot repack boot.img new-boot.img 2>&1)
         KERNEL_SZ=$(echo "$REPACK_OUTPUT" | grep -oP 'KERNEL_SZ\s*\[\K[0-9]+' | tail -1)
