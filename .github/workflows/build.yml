@@ -206,37 +206,43 @@ jobs:
         
         echo ""
         echo "=== [3/9] Cleaning terminfo (keep essential) ==="
-        mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
-        TERMINFO_KEPT=""
-        for term in linux vt100 vt102 xterm xterm-256color; do
-          case $term in
-            linux) dir="l" ;;
-            vt100|vt102) dir="v" ;;
-            xterm|xterm-256color) dir="x" ;;
-          esac
-          if magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/$dir/$term terminfo_keep/$dir/$term" 2>/dev/null; then
-            TERMINFO_KEPT="$TERMINFO_KEPT $term"
-            echo "  ✓ Extracted: $term"
-          else
-            echo "  - Not found: $term"
+        # Check if terminfo exists and list contents
+        if magiskboot cpio ramdisk.cpio "exists system/etc/terminfo" 2>/dev/null; then
+          echo "  terminfo directory found, extracting contents..."
+          mkdir -p terminfo_keep/l terminfo_keep/v terminfo_keep/x
+          TERMINFO_KEPT=""
+          for term in linux vt100 vt102 xterm xterm-256color; do
+            case $term in
+              linux) dir="l" ;;
+              vt100|vt102) dir="v" ;;
+              xterm|xterm-256color) dir="x" ;;
+            esac
+            if magiskboot cpio ramdisk.cpio "extract system/etc/terminfo/$dir/$term terminfo_keep/$dir/$term" 2>/dev/null; then
+              TERMINFO_KEPT="$TERMINFO_KEPT $term"
+              echo "  ✓ Extracted: $term"
+            else
+              echo "  - Not found: $term"
+            fi
+          done
+          if magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null; then
+            echo "  ✓ Removed terminfo directory"
           fi
-        done
-        if magiskboot cpio ramdisk.cpio "rm -r system/etc/terminfo" 2>/dev/null; then
-          echo "  ✓ Removed terminfo directory"
+          magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo" 2>/dev/null || true
+          magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l" 2>/dev/null || true
+          magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v" 2>/dev/null || true
+          magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x" 2>/dev/null || true
+          for term in linux vt100 vt102 xterm xterm-256color; do
+            case $term in
+              linux) dir="l" ;;
+              vt100|vt102) dir="v" ;;
+              xterm|xterm-256color) dir="x" ;;
+            esac
+            [ -f "terminfo_keep/$dir/$term" ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/$dir/$term terminfo_keep/$dir/$term" 2>/dev/null
+          done
+          echo "  Kept:$TERMINFO_KEPT"
+        else
+          echo "  terminfo directory not found, skipping..."
         fi
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/l" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/v" 2>/dev/null || true
-        magiskboot cpio ramdisk.cpio "mkdir 0755 system/etc/terminfo/x" 2>/dev/null || true
-        for term in linux vt100 vt102 xterm xterm-256color; do
-          case $term in
-            linux) dir="l" ;;
-            vt100|vt102) dir="v" ;;
-            xterm|xterm-256color) dir="x" ;;
-          esac
-          [ -f "terminfo_keep/$dir/$term" ] && magiskboot cpio ramdisk.cpio "add 0644 system/etc/terminfo/$dir/$term terminfo_keep/$dir/$term" 2>/dev/null
-        done
-        echo "  Kept:$TERMINFO_KEPT"
         
         echo ""
         echo "=== [4/9] Removing extra themes (keep Default) ==="
