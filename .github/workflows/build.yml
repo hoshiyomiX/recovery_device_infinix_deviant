@@ -10,11 +10,11 @@ on:
       build_type:
         description: 'Build Type'
         required: false
-        default: 'With cache /out'
+        default: 'Fresh build'
         type: choice
         options:
-          - With cache /out
-          - Without cache /out
+          - Fresh build
+          - Clean build
       force_refresh_cache:
         description: 'Force refresh all caches (ignore existing cache)'
         required: false
@@ -83,17 +83,6 @@ jobs:
         ccache -M 10G
         ccache -z
 
-    - name: Cache build output
-      if: github.event.inputs.force_refresh_cache != 'true'
-      uses: actions/cache@v4
-      id: cache-out
-      with:
-        path: ~/OrangeFox/fox_12.1/out
-        key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
-        restore-keys: |
-          out-${{ env.DEVICE }}-
-          out-
-
     - name: Sync OrangeFox source
       run: |
         echo "=== Syncing OrangeFox source ==="
@@ -122,15 +111,15 @@ jobs:
         export CCACHE_DIR=/tmp/ccache
         set -e
 
-        BUILD_TYPE="${{ github.event.inputs.build_type || 'With cache /out' }}"
+        BUILD_TYPE="${{ github.event.inputs.build_type || 'Fresh build' }}"
 
         lunch twrp_${{ env.DEVICE }}-eng
 
-        if [ "$BUILD_TYPE" = "Without cache /out" ]; then
-          echo "=== Build without cached /out (Fresh) ==="
+        if [ "$BUILD_TYPE" = "Clean build" ]; then
+          echo "=== Clean build ==="
           make clean
         else
-          echo "=== Build with cached /out ==="
+          echo "=== Fresh build ==="
         fi
 
         mka adbd bootimage -j$(nproc --all)
@@ -182,12 +171,6 @@ jobs:
       with:
         path: /tmp/ccache
         key: ccache-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
-
-    - name: Save build output
-      uses: actions/cache/save@v4
-      with:
-        path: ~/OrangeFox/fox_12.1/out
-        key: out-${{ env.DEVICE }}-${{ steps.get-date.outputs.week }}
 
     - name: Upload original boot image
       uses: actions/upload-artifact@v4
