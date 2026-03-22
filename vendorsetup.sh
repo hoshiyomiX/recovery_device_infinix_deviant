@@ -11,7 +11,7 @@ export FOX_RECOVERY_SYSTEM_PARTITION="/dev/block/by-name/system"
 export FOX_RECOVERY_VENDOR_PARTITION="/dev/block/by-name/vendor"
 export FOX_RECOVERY_SYSTEM_EXT_PARTITION="/dev/block/by-name/system_ext"
 export FOX_RECOVERY_PRODUCT_PARTITION="/dev/block/by-name/product"
-    
+
 # Device Partition Setup
 export FOX_AB_DEVICE=1
 export FOX_VIRTUAL_AB_DEVICE=1
@@ -28,21 +28,24 @@ export FOX_DELETE_AROMAFM=1
 export FOX_REMOVE_AAPT=1
 
 # ============================================
-# BusyBox Configuration (Replace bash/nano/gnutar)
-# BusyBox provides: ash shell, tar, vi, gzip, bzip2, xz, zip/unzip
-# Size: ~800 KB vs bash(1.4MB) + gnutar(982KB) = 2.4 MB
-# Savings: ~1.6 MB
+# BusyBox Configuration
+# BusyBox ash provides bash-like shell (via FOX_ASH_IS_BASH)
+# Applets: sh, ash, bash (symlink to ash), tar, vi, gzip, xz, zip
+# Size: ~800 KB vs bash(1.4MB) + gnutar(982KB) + nano(830KB) = 3.2 MB
+# Savings: ~2.4 MB
 # ============================================
 export TW_INCLUDE_BUSYBOX=true
 export FOX_USE_BUSYBOX=1
-export FOX_USE_BUSYBOX_APPLETS="sh,ash,tar,gzip,gunzip,bzip2,bunzip2,xz,unxz,zip,unzip,vi,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd"
+export FOX_USE_BUSYBOX_APPLETS="sh,ash,bash,tar,gzip,gunzip,bzip2,bunzip2,xz,unxz,zip,unzip,vi,sed,awk,grep,find,ps,kill,cat,head,tail,ls,cp,mv,rm,mkdir,rmdir,chmod,chown,mount,umount,df,du,dd,ln,echo,printf,test"
 
 # Exclude bash/nano/gnutar - Use BusyBox instead
 export TW_EXCLUDE_BASH=true
 export TW_EXCLUDE_NANO=true
 export TW_EXCLUDE_GNU_TAR=true
 
-# Feature Support (BusyBox replacements)
+# Feature Support
+export FOX_ENABLE_APP_MANAGER=1
+export FOX_ASH_IS_BASH=true
 export FOX_USE_TAR_BINARY=1
 export FOX_USE_XZ_UTILS=1
 
@@ -81,7 +84,7 @@ export OF_ENABLE_LPTOOLS=1
 export OF_ADVANCED_SECURITY=1
 export FOX_BUGGED_AOSP_ARB_WORKAROUND="1546300800"
 export OF_KEEP_DM_VERITY=1
-export OF_DISABLE_MIUI_SPECIFIC_FEATURES=1 
+export OF_DISABLE_MIUI_SPECIFIC_FEATURES=1
 
 # UI Layout Settings
 export OF_SCREEN_H=2400
