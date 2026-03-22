@@ -147,22 +147,7 @@ jobs:
         echo "=============================================="
         echo "          CCACHE STATISTICS"
         echo "=============================================="
-        ccache -s | tee ccache_stats.txt
-        
-        # Extract key metrics
-        CACHE_HIT=$(grep -oP '^\s*Hits:\s+\K[0-9]+' ccache_stats.txt | head -1)
-        CACHE_MISS=$(grep -oP '^\s*Misses:\s+\K[0-9]+' ccache_stats.txt | head -1)
-        CACHE_SIZE=$(grep -oP '^Cache size \(GiB\):\s+\K[0-9.]+' ccache_stats.txt || grep -oP '^Cache size:\s+\K[0-9.]+' ccache_stats.txt)
-        
-        echo ""
-        echo "=== SUMMARY ==="
-        echo "  Cache Hits:  ${CACHE_HIT:-N/A}"
-        echo "  Cache Miss:  ${CACHE_MISS:-N/A}"
-        if [ -n "$CACHE_HIT" ] && [ -n "$CACHE_MISS" ] && [ "$CACHE_HIT" -gt 0 ]; then
-          HIT_RATE=$((CACHE_HIT * 100 / (CACHE_HIT + CACHE_MISS)))
-          echo "  Hit Rate:    ${HIT_RATE}%"
-        fi
-        echo "  Cache Size:  ${CACHE_SIZE:-N/A} GiB"
+        ccache -s 2>/dev/null || true
         echo "=============================================="
       continue-on-error: true
 
